@@ -2,3 +2,8 @@
 .claude/settings.local.json
 .codex/hooks.json
 .agents/hooks.json
+
+# axhub import: local agent runtime state
+.axhub/
+.claude/
+.codex/
