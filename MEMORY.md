@@ -5,14 +5,18 @@ Last updated: 2026-11-11
 ## 지금 상태
 
 - 업무 **W07 관련 거래처와 판매장려금 지급** 선택. 설계 문서 `docs/W07_설계안.md` v0.2 · `docs/architecture.md` v0.2(아키텍처 · 페이지 흐름 · AI 워크플로 · ERD).
-- 뼈대: `backend/` .py 80개 · `frontend/src/` 47개 (설명 주석만), `backend/.gitignore` · `frontend/.gitignore`. 아직 커밋 안 됨.
-- GitHub `LeoChoi224/related-party-rebate-agent`(`origin`, 퍼블릭) — 사용자가 생성, 커밋 1개(`Initial commit`).
+- 프로젝트 폴더: `~/LeoData/MyCode/rebate-agent` (11/11 `삼일PwC_프로젝트폴더`에서 이름 변경. 기록 훅은 폴더 경로를 쓰지 않아 영향 없음).
+- 뼈대: `backend/` .py 80개 · `frontend/src/` 47개 (설명 주석만, ruff format 정리됨), 폴더별 `.gitignore`. PR #1(`chore/project-skeleton`)로 main 에 머지됨.
+- 원격: `origin` = Axhub 저장소(배포용), `github` = GitHub `LeoChoi224/related-party-rebate-agent`(퍼블릭, 포트폴리오용). 라벨: GitHub 기본 10개 + `chore`.
 - axhub CLI v0.63.0(`~/.axhub/bin/axhub`, PATH 미등록) · 플러그인 axhub@axhub 1.43.0 · 로그인 완료(leochoi224@gmail.com). lounge 테넌트 ID `c7a0a6fe-86c6-45f4-adc2-3ab7bd19ea36`.
-- 진행 중: 로드맵 01 `chore/scaffold-fastapi-react` Step 1.
+- **AXHub 첫 배포 완료(11/11)**: 앱 `related-party-rebate-agent`(Docker), 주소 https://related-party-rebate-agent-h6nw.axhub.app , 화면 "AX 인재전쟁 배포 테스트" 확인. 참가 페이지 환경설치 4/4 완료. 크레딧 절약을 위해 사용자가 앱을 잠시 내려 둠.
+- 로드맵 01(최소 앱) · 02(배포 설정)는 사용자 요청으로 Claude 가 직접 작성 · 커밋 · 배포했다. 로컬 `main` = 01·02 커밋 + axhub 가 만든 커밋 3개 + `.gitignore` 복구 커밋(`750dfd5`). Axhub `origin/main` 에는 올라갔고 **GitHub 에는 아직 안 올림**(`github/main` 은 PR #1 머지 시점).
 
 ## 다음에 할 일
 
-- 01 Step 2 · 3 (사용자 타이핑) → 02 `chore/axhub-first-deploy` (Dockerfile · .dockerignore · axhub.yaml, 앱 생성은 사용자가 직접 실행).
+- GitHub 반영 방법 결정(브랜치 + PR 또는 main 직접 push) → 사용자 확인 후.
+- 제출 전 앱을 다시 켜고(`axhub apps resume` 또는 wake) 심사 기간 동안 열어 둔다.
+- 로드맵 03 `feat/data-loader` 부터 Step 1→2→3.
 
 ## 결정과 근거
 

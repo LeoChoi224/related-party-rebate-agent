@@ -1,0 +1,16 @@
+# 대회 기록 키가 든 폴더는 이미지에 절대 넣지 않는다.
+.claude
+.codex
+.agents
+
+.git
+**/node_modules
+frontend/dist
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.env
+**/.env.*
+**/*.db
+**/*.sqlite3
+.DS_Store

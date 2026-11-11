@@ -1,4 +1,12 @@
 /**
- * 앱 진입점.
- * React 루트를 렌더링하고, 라우터와 역할 컨텍스트로 앱 전체를 감싼다.
+ * 앱 진입점. React 루트를 index.html 의 #root 에 붙인다.
  */
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
