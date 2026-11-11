@@ -5,14 +5,17 @@ Last updated: 2026-11-11
 ## 지금 상태
 
 - 업무 **W07 관련 거래처와 판매장려금 지급** 선택. 설계 문서 `docs/W07_설계안.md` v0.2 · `docs/architecture.md` v0.2(아키텍처 · 페이지 흐름 · AI 워크플로 · ERD).
-- 뼈대: `backend/` .py 80개 · `frontend/src/` 47개 (설명 주석만), `backend/.gitignore` · `frontend/.gitignore`. 아직 커밋 안 됨.
-- GitHub `LeoChoi224/related-party-rebate-agent`(`origin`, 퍼블릭) — 사용자가 생성, 커밋 1개(`Initial commit`).
+- 프로젝트 폴더: `~/LeoData/MyCode/rebate-agent` (11/11 `삼일PwC_프로젝트폴더`에서 이름 변경. 기록 훅은 폴더 경로를 쓰지 않아 영향 없음).
+- 뼈대: `backend/` .py 80개 · `frontend/src/` 47개 (설명 주석만, ruff format 정리됨), 폴더별 `.gitignore`. PR #1(`chore/project-skeleton`)로 main 에 머지됨.
+- GitHub `LeoChoi224/related-party-rebate-agent`(`origin`, 퍼블릭). 라벨: GitHub 기본 10개(`chore` 라벨은 사용자가 만들기로 함).
 - axhub CLI v0.63.0(`~/.axhub/bin/axhub`, PATH 미등록) · 플러그인 axhub@axhub 1.43.0 · 로그인 완료(leochoi224@gmail.com). lounge 테넌트 ID `c7a0a6fe-86c6-45f4-adc2-3ab7bd19ea36`.
-- 진행 중: 로드맵 01 `chore/scaffold-fastapi-react` Step 1.
+- AXHub 앱은 아직 없음(`related-party-rebate-agent` 이름 사용 가능 상태).
+- 진행 중: 로드맵 01 `chore/scaffold-fastapi-react` — Step 3 정답은 줬고, 사용자 반영 전.
 
 ## 다음에 할 일
 
-- 01 Step 2 · 3 (사용자 타이핑) → 02 `chore/axhub-first-deploy` (Dockerfile · .dockerignore · axhub.yaml, 앱 생성은 사용자가 직접 실행).
+- 01 Step 3 반영(사용자) → Claude 검증 → 커밋 · 푸시 · PR(사용자).
+- 02 `chore/axhub-first-deploy`: Dockerfile · .dockerignore · axhub.yaml(승인 후 작성) → 앱 생성 · 배포 명령은 사용자가 실행 → Claude 가 배포 상태 확인 · 주소 보고.
 
 ## 결정과 근거
 
