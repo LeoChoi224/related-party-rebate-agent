@@ -1,5 +1,11 @@
-"""환경 설정.
+"""앱 전역 설정.
 
-.env에서 읽는 값을 한곳에 모은다.
-예: DB 경로, 원본 데이터 경로, LLM 회사·모델 이름, API 키, 대체 모드 여부, 가상기업 기준일(2026-07-01).
+지금은 경로만 둔다. .env 값(LLM 키 등)은 필요해지는 브랜치에서 추가한다.
 """
+
+from pathlib import Path
+
+# core → app → backend → 프로젝트 루트
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = BACKEND_DIR.parent
+FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
