@@ -1,0 +1,4 @@
+# 기록 키가 든 설정 — git 에 올리지 않아요
+.claude/settings.local.json
+.codex/hooks.json
+.agents/hooks.json

@@ -1,0 +1,172 @@
+<?xml version='1.0' encoding='utf-8'?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="W06_Definitions" targetNamespace="https://ax-challenge.local/bpmn">
+  <bpmn:collaboration id="W06_Collaboration">
+    <bpmn:participant id="W06_Pool" name="해외 시장 실험과 성과 확인" processRef="W06_Process"/>
+  </bpmn:collaboration>
+  <bpmn:process id="W06_Process" name="해외 시장 실험과 성과 확인" isExecutable="false">
+    <bpmn:documentation>현재 업무를 설명하는 교육용 BPMN. 추가 부서·검토 절차는 안내서의 업무 가정이며 실행 가능한 시스템 설계가 아닙니다. 승인 분기는 사람이 수행한 별도 승인 절차의 결과이며, 세부 승인 단계는 생략했습니다. 보류·재검토 종료는 이번 검토 회차의 종료로, 후속 확인 의무의 종료를 뜻하지 않습니다.</bpmn:documentation>
+    <bpmn:laneSet id="W06_Lanes">
+      <bpmn:lane id="W06_Lane0" name="마케팅">
+        <bpmn:flowNodeRef>W06_start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>W06_t1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>W06_t4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>W06_t6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>W06_end_yes</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="W06_Lane1" name="해외 운영">
+        <bpmn:flowNodeRef>W06_t2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>W06_t5</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="W06_Lane2" name="재무">
+        <bpmn:flowNodeRef>W06_t3</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="W06_Lane3" name="승인권자">
+        <bpmn:flowNodeRef>W06_gate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>W06_end_no</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="W06_start" name="업무 발생">
+      <bpmn:outgoing>W06_Flow0</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="W06_t1" name="해외 집행안 작성">
+      <bpmn:incoming>W06_Flow0</bpmn:incoming>
+      <bpmn:outgoing>W06_Flow1</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="W06_t2" name="배송·채널조건 회신 취합">
+      <bpmn:incoming>W06_Flow1</bpmn:incoming>
+      <bpmn:outgoing>W06_Flow2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="W06_t3" name="예산·승인권한 확인">
+      <bpmn:incoming>W06_Flow2</bpmn:incoming>
+      <bpmn:outgoing>W06_Flow3</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="W06_gate" name="실험 집행이 승인됐는가?">
+      <bpmn:incoming>W06_Flow3</bpmn:incoming>
+      <bpmn:outgoing>W06_Flow4</bpmn:outgoing>
+      <bpmn:outgoing>W06_Flow5</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="W06_t4" name="승인 조건대로 캠페인 집행">
+      <bpmn:incoming>W06_Flow4</bpmn:incoming>
+      <bpmn:outgoing>W06_Flow6</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="W06_t5" name="집행 결과 부서별 취합">
+      <bpmn:incoming>W06_Flow6</bpmn:incoming>
+      <bpmn:outgoing>W06_Flow7</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="W06_t6" name="성과표·후속 회의자료 작성">
+      <bpmn:incoming>W06_Flow7</bpmn:incoming>
+      <bpmn:outgoing>W06_Flow8</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="W06_end_yes" name="결과 보고">
+      <bpmn:incoming>W06_Flow8</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="W06_end_no" name="보완·재검토">
+      <bpmn:incoming>W06_Flow5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="W06_Flow0" sourceRef="W06_start" targetRef="W06_t1" name=""/>
+    <bpmn:sequenceFlow id="W06_Flow1" sourceRef="W06_t1" targetRef="W06_t2" name=""/>
+    <bpmn:sequenceFlow id="W06_Flow2" sourceRef="W06_t2" targetRef="W06_t3" name=""/>
+    <bpmn:sequenceFlow id="W06_Flow3" sourceRef="W06_t3" targetRef="W06_gate" name=""/>
+    <bpmn:sequenceFlow id="W06_Flow4" sourceRef="W06_gate" targetRef="W06_t4" name="예"/>
+    <bpmn:sequenceFlow id="W06_Flow5" sourceRef="W06_gate" targetRef="W06_end_no" name="아니오"/>
+    <bpmn:sequenceFlow id="W06_Flow6" sourceRef="W06_t4" targetRef="W06_t5" name=""/>
+    <bpmn:sequenceFlow id="W06_Flow7" sourceRef="W06_t5" targetRef="W06_t6" name=""/>
+    <bpmn:sequenceFlow id="W06_Flow8" sourceRef="W06_t6" targetRef="W06_end_yes" name=""/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="W06_Diagram">
+    <bpmndi:BPMNPlane id="W06_Plane" bpmnElement="W06_Collaboration">
+      <bpmndi:BPMNShape id="W06_Pool_di" bpmnElement="W06_Pool" isHorizontal="true">
+        <dc:Bounds x="24" y="102" width="1752" height="512"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_Lane0_di" bpmnElement="W06_Lane0" isHorizontal="true">
+        <dc:Bounds x="54" y="102" width="1722" height="128"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_Lane1_di" bpmnElement="W06_Lane1" isHorizontal="true">
+        <dc:Bounds x="54" y="230" width="1722" height="128"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_Lane2_di" bpmnElement="W06_Lane2" isHorizontal="true">
+        <dc:Bounds x="54" y="358" width="1722" height="128"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_Lane3_di" bpmnElement="W06_Lane3" isHorizontal="true">
+        <dc:Bounds x="54" y="486" width="1722" height="128"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_start_di" bpmnElement="W06_start">
+        <dc:Bounds x="206.0" y="150.0" width="32" height="32"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_t1_di" bpmnElement="W06_t1">
+        <dc:Bounds x="331.0" y="136.0" width="136" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_t2_di" bpmnElement="W06_t2">
+        <dc:Bounds x="508.0" y="264.0" width="136" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_t3_di" bpmnElement="W06_t3">
+        <dc:Bounds x="685.0" y="392.0" width="136" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_gate_di" bpmnElement="W06_gate" isMarkerVisible="true">
+        <dc:Bounds x="907.0" y="527.0" width="46" height="46"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_t4_di" bpmnElement="W06_t4">
+        <dc:Bounds x="1039.0" y="136.0" width="136" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_t5_di" bpmnElement="W06_t5">
+        <dc:Bounds x="1216.0" y="264.0" width="136" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_t6_di" bpmnElement="W06_t6">
+        <dc:Bounds x="1393.0" y="136.0" width="136" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_end_yes_di" bpmnElement="W06_end_yes">
+        <dc:Bounds x="1622.0" y="150.0" width="32" height="32"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="W06_end_no_di" bpmnElement="W06_end_no">
+        <dc:Bounds x="1622.0" y="534.0" width="32" height="32"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="W06_Flow0_di" bpmnElement="W06_Flow0">
+        <di:waypoint x="238.0" y="166.0"/>
+        <di:waypoint x="331.0" y="166.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="W06_Flow1_di" bpmnElement="W06_Flow1">
+        <di:waypoint x="467.0" y="166.0"/>
+        <di:waypoint x="487.5" y="166.0"/>
+        <di:waypoint x="487.5" y="294.0"/>
+        <di:waypoint x="508.0" y="294.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="W06_Flow2_di" bpmnElement="W06_Flow2">
+        <di:waypoint x="644.0" y="294.0"/>
+        <di:waypoint x="664.5" y="294.0"/>
+        <di:waypoint x="664.5" y="422.0"/>
+        <di:waypoint x="685.0" y="422.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="W06_Flow3_di" bpmnElement="W06_Flow3">
+        <di:waypoint x="821.0" y="422.0"/>
+        <di:waypoint x="864.0" y="422.0"/>
+        <di:waypoint x="864.0" y="550.0"/>
+        <di:waypoint x="907.0" y="550.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="W06_Flow4_di" bpmnElement="W06_Flow4">
+        <di:waypoint x="930.0" y="527.0"/>
+        <di:waypoint x="930.0" y="166.0"/>
+        <di:waypoint x="1039.0" y="166.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="W06_Flow5_di" bpmnElement="W06_Flow5">
+        <di:waypoint x="953.0" y="550.0"/>
+        <di:waypoint x="1622.0" y="550.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="W06_Flow6_di" bpmnElement="W06_Flow6">
+        <di:waypoint x="1175.0" y="166.0"/>
+        <di:waypoint x="1195.5" y="166.0"/>
+        <di:waypoint x="1195.5" y="294.0"/>
+        <di:waypoint x="1216.0" y="294.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="W06_Flow7_di" bpmnElement="W06_Flow7">
+        <di:waypoint x="1352.0" y="294.0"/>
+        <di:waypoint x="1372.5" y="294.0"/>
+        <di:waypoint x="1372.5" y="166.0"/>
+        <di:waypoint x="1393.0" y="166.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="W06_Flow8_di" bpmnElement="W06_Flow8">
+        <di:waypoint x="1529.0" y="166.0"/>
+        <di:waypoint x="1622.0" y="166.0"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
