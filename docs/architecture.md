@@ -1,6 +1,6 @@
-# W07 판매장려금 통제 데스크 — 설계 다이어그램
+# W07 판매장려금 통제 데스크 — 설계 다이어그램 (v0.2)
 
-> 기준: [W07_설계안.md](W07_설계안.md) v0.1 · 스택 FastAPI + SQLite + React(Vite) + LangChain · 배포 AXHub
+> 기준: [W07_설계안.md](W07_설계안.md) v0.2 · 스택 FastAPI + SQLite + React(Vite) + LangGraph · 배포 AXHub
 > 데이터 출처 표기: **[원본]** 원본 기록 · **[주장]** 부서 주장 · **[가정]** 교육용 가정 · **[모의]** 모의 회신
 
 ---
@@ -8,8 +8,9 @@
 ## 1. 시스템 아키텍처
 
 - 배포 단위는 **컨테이너 1개, 주소 1개**다. FastAPI가 `/api`와 React 빌드 결과(`dist`)를 함께 내보낸다.
-- **승인 경로는 코드가 정한다.** AI는 해석과 초안만 만들고, 상태는 바꾸지 못한다.
-- 원본 CSV는 읽기만 한다. 앱이 켜지거나 초기화할 때 원본으로 SQLite 초기 상태를 다시 만든다.
+- **AI가 판단·추천하고 사람이 최종 결정한다.** 단, AI는 결재 단계를 올릴 수만 있고 내릴 수는 없다(가드).
+- **업무 상태는 SQLite 업무 DB에만 있다.** LangGraph 체크포인트에는 그래프가 어디까지 진행됐는지만 있다.
+- 원본 CSV는 읽기만 한다. 앱이 켜지거나 초기화할 때 원본으로 초기 상태를 다시 만든다.
 
 ```mermaid
 flowchart LR
@@ -26,23 +27,28 @@ flowchart LR
     FE["React SPA<br/>Vite 빌드 결과 dist"]
     subgraph BE["FastAPI"]
       direction TB
-      API["API 라우터<br/>claims · approvals · tasks<br/>agencies · events · demo"]
-      subgraph DOMAIN["도메인 서비스 · 결정적 코드"]
-        RP["관련자 판정 엔진<br/>2개 이상 일치 · 전이 연결"]
-        LR["한도 규칙<br/>그룹 월 합산 200만원"]
-        SM["상태 머신<br/>허용된 전이만 통과"]
-        TE["작업 엔진<br/>부서별 작업 생성"]
-        OF["상계 검토 · 확장<br/>연체 채권 대조"]
+      API["API 라우터<br/>claims · approvals · explanations<br/>offsets · tasks · events · demo"]
+      subgraph AGENT["AI 에이전트 계층 · LangGraph"]
+        RUN["그래프 실행기<br/>thread_id = 대상 건 ID<br/>사람 결정이 오면 재개"]
+        GCR["claim_review<br/>장려금 건 검토"]
+        GER["explanation_review<br/>소명 검토 에이전트"]
+        GMC["master_change_parser<br/>정정 신고 해석"]
+        TOOLS["조회 도구<br/>대리점 · 입금 · 미수채권 · 관련자 그룹"]
+        GUARD["가드<br/>숫자 대조 · 결재 단계 하한 · 형식"]
+        LLMGW["LLM 게이트웨이<br/>Claude · OpenAI · 대체 모드"]
       end
-      subgraph AIL["AI 계층 · LangChain"]
-        CH["체인 3개<br/>승인 요약 · 소명 검토 · 정정 해석"]
-        VF["검증기<br/>숫자 대조 · 스키마 검사"]
-        GW["LLM 게이트웨이<br/>Claude · OpenAI · 대체 모드"]
+      subgraph DOMAIN["도메인 서비스 · 결정적 코드"]
+        RP["관련자 판정<br/>2개 이상 일치 · 전이 연결"]
+        AUTH["결재 권한<br/>그룹 월 합산 · 최소 결재권자"]
+        SM["상태 머신<br/>허용된 전이만 통과"]
+        TE["작업 생성<br/>부서별 작업"]
+        OF["상계 검토 · 확장<br/>연체 채권 대조"]
       end
       MK["모의 외부<br/>은행 회신 · 대리점 회신"]
       SD["시더<br/>원본 CSV를 초기 상태로"]
     end
-    DB[("SQLite<br/>업무 상태 · 이벤트 이력")]
+    DB[("SQLite 업무 DB<br/>업무 상태의 유일한 기준")]
+    CK[("LangGraph 체크포인트<br/>그래프 진행 위치만")]
   end
 
   RAW[/"원본 CSV · 읽기 전용<br/>01_참가자_배포용/04_원본데이터"/]
@@ -51,15 +57,31 @@ flowchart LR
 
   USER --> FE
   FE -- "JSON /api" --> API
+  API --> RUN
   API --> DOMAIN
-  API --> AIL
   API --> MK
-  CH --> VF
-  CH --> GW
-  GW --> LLM
-  DOMAIN --> DB
-  AIL --> DB
+  RUN --> GCR
+  RUN --> GER
+  RUN --> GMC
+  RUN --> CK
+  GCR --> TOOLS
+  GER --> TOOLS
+  GMC --> TOOLS
+  GCR --> GUARD
+  GER --> GUARD
+  GMC --> GUARD
+  GCR --> LLMGW
+  GER --> LLMGW
+  GMC --> LLMGW
+  LLMGW --> LLM
+  TOOLS --> RP
+  GUARD --> AUTH
+  RUN -- "사람 결정 뒤 반영" --> SM
+  SM --> DB
+  TE --> DB
+  OF --> DB
   MK --> DB
+  TOOLS -. "읽기" .-> DB
   RAW --> SD
   EXT --> SD
   SD --> DB
@@ -69,8 +91,9 @@ flowchart LR
 
 ## 2. 페이지 흐름도
 
-- 같은 화면이라도 역할에 따라 보이는 버튼이 다르다. 예: 상신 건의 승인 버튼은 영업임원에게만 보인다.
-- 시연 패널은 외부에서 들어오는 사건(접수, 정정 신고, 모의 회신)을 넣는 곳이다. 그 뒤 처리는 시스템이 한다.
+- 결재권자는 **코드가 계산한 최소 결재권자** 이상이어야 한다. 같은 화면이라도 역할에 따라 보이는 버튼이 다르다.
+- 결정 화면마다 **AI 추천 패널**(추천 · 근거 · 반대 근거 · 확신도)이 있다. 추천과 다르게 결정하면 사유를 반드시 입력한다.
+- 시연 패널은 외부 사건(접수, 정정 신고, 모의 회신)을 넣는 곳이다. 그 뒤 처리는 시스템이 한다.
 
 ```mermaid
 flowchart TD
@@ -81,19 +104,24 @@ flowchart TD
   ROLE -->|내부감사| TASKS
   ROLE -->|시연 관리자| DEMO
 
-  INBOX["처리함<br/>역할별 대기 건 · 상태 필터"] --> CLAIM["장려금 건 상세<br/>관련자 근거 · 그룹 합산 · AI 요약 · 출처 배지"]
+  INBOX["처리함<br/>역할별 대기 건 · 상태 필터"] --> CLAIM["장려금 건 상세<br/>규정 계산 결과 · AI 추천 패널<br/>근거 · 반대 근거 · 출처 배지"]
   CLAIM --> GROUP["관련자 그룹 상세<br/>일치 속성 표 · 그룹 버전 이력"]
   GROUP --> AGENCY["대리점 상세<br/>마스터 · 입금 기록 · 미수채권"]
   CLAIM --> LOG["이벤트 이력<br/>누가 · 언제 · 무엇을 · 왜"]
+  LOG --> AIREC["AI 추천 기록<br/>추천과 사람 결정의 일치 여부"]
 
-  CLAIM -->|"전결 · 영업지원팀"| CHECK
-  CLAIM -->|"상신 · 영업지원팀"| APPROVAL["승인 요청 상세<br/>영업임원 승인 · 반려"]
+  CLAIM --> AUTHQ{"최소 결재권자<br/>코드 계산"}
+  AUTHQ -->|영업지원팀| SUPP["영업지원팀 결정<br/>AI 추천 참고 · 다르면 사유 필수"]
+  AUTHQ -->|영업임원| APPROVAL["승인 요청 상세<br/>AI 추천과 함께 영업임원 결정"]
+  SUPP -->|"전결 승인"| CHECK
+  SUPP -->|"상신 · AI가 올린 경우 포함"| APPROVAL
+  SUPP -->|"소명 먼저"| EXPL
   APPROVAL -->|승인| CHECK{"같은 그룹에<br/>연체 채권이 있나"}
-  APPROVAL -->|"반려 · 소명 먼저"| EXPL["소명 요청 · 회신<br/>AI 검토 결과 · 사람 확인"]
-  EXPL -->|"증빙 충분 · 재상신"| APPROVAL
+  APPROVAL -->|"반려 · 소명 먼저"| EXPL["소명 요청 · 회신<br/>AI 주장별 대조 결과 · 사람 확인"]
+  EXPL -->|"증빙 충분 · 재판정"| AUTHQ
   EXPL -->|"증빙 부족"| HOLD["지급보류<br/>추가 요청 작업"]
 
-  CHECK -->|있음| OFFSET["상계 검토 · 확장<br/>영업 의견 · 재무 승인 · 대리점 동의"]
+  CHECK -->|있음| OFFSET["상계 검토 · 확장<br/>AI 추천 상계액 · 영업 의견<br/>재무 승인 · 대리점 동의"]
   CHECK -->|없음| PAY
   OFFSET -->|"차액 지급"| PAY["지급 지시<br/>모의 은행 회신"]
   OFFSET -->|"전액 상계"| DONE
@@ -107,61 +135,54 @@ flowchart TD
 
 ---
 
-## 3. AI 워크플로우
+## 3. AI 워크플로우 (LangGraph)
 
-- AI가 쓰이는 곳은 세 군데다. **승인 요약**, **소명 검토**, **정정 해석**.
-- 모든 AI 출력은 검증기를 거친다. 2번 실패하면 대체 모드(템플릿 응답)로 넘어간다.
-- AI 결과는 반드시 사람이 확인한 뒤에만 상태 전이로 이어진다. 모든 AI 호출은 `AI_CALL_LOG`에 남는다.
+- 그래프는 3개다. 그래프 1회 실행 = 대상 건 1개 = thread 1개.
+- `[[ ]]` 모양은 **interrupt**다. 그래프가 여기서 멈추고, 사람 결정이나 외부 회신이 오면 이어서 실행된다.
+- **상태를 바꾸는 노드는 `apply_*`뿐이다.** 모두 사람 결정 뒤에 있다.
+- AI가 결재 단계를 최소 결재권자보다 낮게 판단하면 `raise_authority`가 코드 값으로 고정하고 불일치를 기록한다.
 
 ```mermaid
 flowchart TD
-  subgraph IN["입력 사건"]
-    E1["6월분 장려금 40건 접수 [원본]"]
-    E2["소명 회신 · 자유 문장 [모의]"]
-    E3["마스터 정정 신고 · 문장"]
+  subgraph CR["claim_review · 장려금 건 검토"]
+    S1(["시작<br/>접수 · 재검토필요"]) --> N1["load_context · 도구<br/>대리점 · 입금 · 미수채권 · 그룹"]
+    N1 --> N2["compute_rules · 코드<br/>관련자 판정 · 그룹 합산<br/>최소 결재권자"]
+    N2 --> N3["assess · AI<br/>추천: 전결 · 상신 · 소명 먼저 · 상계 검토<br/>근거 · 반대 근거 · 확신도"]
+    N3 --> N4{"verify · 가드<br/>숫자가 계산값과 같은가<br/>결재 단계가 최소 이상인가"}
+    N4 -->|"숫자 불일치 · 1회차"| N3
+    N4 -->|"2회 실패"| N5["fallback<br/>AI 추천 없이 규정 결과만"]
+    N4 -->|"결재 단계가 낮음"| N6["raise_authority<br/>코드 값으로 고정 · 불일치 기록"]
+    N4 -->|통과| N7
+    N5 --> N7
+    N6 --> N7
+    N7[["human_decision · interrupt<br/>AI 추천과 함께 결정 요청"]]
+    N7 -->|"사람 결정 도착"| N8["apply_decision<br/>DB 상태 변경 · 작업 생성<br/>추천 일치 여부 기록"]
+    N8 --> N9{"후속 처리"}
+    N9 -->|"지급 · 상계"| N10[["wait_external · interrupt<br/>은행 회신 · 대리점 동의"]]
+    N10 --> N11["apply_reply<br/>지급완료 · 상계완료 · 지급보류"]
+    N11 --> END1(["끝"])
   end
 
-  subgraph CODE["코드 · 결정적 · 승인 경로를 정함"]
-    C1["관련자 판정<br/>대표자 · 주소 · 등록계좌 · 실입금계좌"]
-    C2{"그룹 월 합산<br/>200만원 초과?"}
-    C3["상태 전이 · 작업 생성"]
-    C4["그룹 재계산 · 새 버전<br/>영향 건에 재검토필요"]
+  subgraph ER["explanation_review · 소명 검토 에이전트"]
+    E0(["소명 회신 도착 [모의]"]) --> E1["extract_claims · AI<br/>회신 속 주장 목록"]
+    E1 --> E2["check_claim · AI + 도구<br/>주장마다 데이터 조회 · 대조"]
+    E2 -->|"남은 주장 있음"| E2
+    E2 --> E3["assess · AI<br/>타당성 · 부족한 증빙 · 추가 요청문"]
+    E3 --> E4{"verify · 가드"}
+    E4 -->|"통과 · 2회 실패 시 대체 모드"| E5[["human_decision · interrupt<br/>영업지원팀 확인"]]
+    E5 -->|"증빙 충분"| S1
+    E5 -->|"증빙 부족"| E6["apply_hold<br/>지급보류 · 추가 요청 작업"]
   end
 
-  subgraph AI["AI · 해석과 초안만 · 상태를 바꾸지 않음"]
-    A1["승인 요약 체인<br/>근거 · 대안 초안"]
-    V1{"숫자가 코드 계산값과<br/>모두 같은가"}
-    A2["소명 검토 체인<br/>사유 유형 · 증빙 충족 여부<br/>부족한 증빙 · 추가 요청문"]
-    V2{"출력 스키마가<br/>맞는가"}
-    A3["정정 해석 체인<br/>대리점 · 속성 · 이전값 · 새값"]
-    V3{"대리점과 속성이<br/>실제로 있는가"}
-    FB["대체 모드<br/>템플릿 응답 · 사람이 직접 작성"]
+  subgraph MC["master_change_parser · 정정 신고 해석"]
+    M0(["정정 신고 문장"]) --> M1["parse · AI<br/>대리점 · 속성 · 이전 값 · 새 값"]
+    M1 --> M2{"verify · 가드<br/>대리점·속성 존재 · 이전 값 일치"}
+    M2 -->|"통과 · 2회 실패 시 직접 입력"| M3[["human_decision · interrupt<br/>영업지원팀 확인"]]
+    M3 -->|확정| M4["apply_change · 코드<br/>그룹 재계산 · 새 버전<br/>영향 건에 재검토필요"]
   end
 
-  subgraph HUMAN["사람 · 결정"]
-    H1["영업임원<br/>승인 · 반려"]
-    H2["영업지원팀<br/>AI 검토 결과 확인 · 수정"]
-    H3["영업지원팀<br/>정정 내용 확인"]
-  end
-
-  E1 --> C1 --> C2
-  C2 -->|"아니오 · 전결"| C3
-  C2 -->|"예 · 상신"| A1 --> V1
-  V1 -->|통과| H1
-  V1 -->|"2회 실패"| FB
-  H1 --> C3
-
-  E2 --> A2 --> V2
-  V2 -->|통과| H2
-  V2 -->|"2회 실패"| FB
-  H2 --> C3
-
-  E3 --> A3 --> V3
-  V3 -->|통과| H3
-  V3 -->|"2회 실패"| FB
-  H3 --> C4 --> C1
-
-  FB --> HUMAN
+  N9 -->|"소명 먼저"| E0
+  M4 -->|"영향 건마다 재실행"| S1
 ```
 
 ---
@@ -171,6 +192,8 @@ flowchart TD
 - 원본 테이블(`AGENCY`, `DEPOSIT`, `AR_ITEM`, `REBATE_CLAIM`)은 `source_file`, `source_row`로 원본 행까지 추적한다.
 - 원본 값은 덮어쓰지 않는다. 상계로 줄어든 채권은 `AR_ADJUSTMENT`에, 정정된 마스터는 `MASTER_CHANGE`와 `IDENTITY_ATTR`의 유효기간으로 남긴다.
 - 관련자 그룹은 **버전 단위**로 다시 계산한다. 정정이 들어오면 새 `GROUP_VERSION`이 생기고, 이전 판단의 근거는 그대로 남는다.
+- `AI_RECOMMENDATION`은 AI 추천과 사람의 최종 결정을 한 행에 함께 남긴다. 추천 일치율을 여기서 계산한다.
+- LangGraph 체크포인트 테이블은 라이브러리가 관리하므로 ERD에 넣지 않았다.
 
 ```mermaid
 erDiagram
@@ -230,7 +253,6 @@ erDiagram
     string old_value
     string new_value
     string raw_text "신고 원문"
-    json ai_parsed
     string confirmed_by
     datetime applied_at
   }
@@ -265,8 +287,8 @@ erDiagram
     string period_ym
     int sales_performance_krw
     int rebate_amount_krw
-    string status "상태 다이어그램 참고"
-    string route "전결 또는 상신"
+    string status "업무 상태 · 유일한 기준"
+    string min_authority "코드 계산 최소 결재권자"
     int group_id FK "판정 당시 그룹"
     int group_sum_krw
     string original_status "원본 승인 미지급 반려"
@@ -278,8 +300,7 @@ erDiagram
     string period_ym
     int group_sum_krw
     string approver_role "영업임원"
-    string ai_summary
-    bool summary_verified
+    int rec_id FK "AI 추천"
     string decision "승인 반려"
     string reason
     string decided_by
@@ -294,24 +315,30 @@ erDiagram
     string rebate_id FK
     json requested_items
     string status
-    string ai_draft "추가 요청문 초안"
   }
   EXPLANATION_REPLY {
     int reply_id PK
     int exp_id FK
     string raw_text
     string provenance "모의"
-    string ai_reason_type
-    bool ai_evidence_ok
-    json ai_missing
+    int rec_id FK "AI 판단"
+    string review_result "사람 확인 결과"
     string reviewed_by
-    string review_result
+  }
+  EXPLANATION_CHECK {
+    int check_id PK
+    int reply_id FK
+    string claim_text "회신 속 주장"
+    string tool_used
+    json evidence_ref "조회한 원본 행"
+    string verdict "일치 불일치 확인불가"
   }
   OFFSET_PROPOSAL {
     int offset_id PK
     string rebate_id FK
     string ar_id FK
     int offset_amount_krw
+    int rec_id FK "AI 추천 상계액"
     string sales_opinion
     string finance_decision
     string agency_consent "모의"
@@ -330,6 +357,28 @@ erDiagram
     string result "성공 계좌오류"
     string provenance "모의"
     datetime replied_at
+  }
+  AI_RECOMMENDATION {
+    int rec_id PK
+    string graph "claim_review 등"
+    string thread_id "대상 건 ID"
+    string target_type
+    string target_id
+    string recommendation
+    json rationale "근거와 원본 행"
+    json counter_evidence
+    float confidence
+    string min_authority "코드 계산"
+    string ai_authority "AI 판단"
+    bool authority_raised "AI가 낮게 판단해 고정됨"
+    bool verified
+    bool fallback_used
+    string model
+    string human_decision
+    string human_reason "추천과 다르면 필수"
+    bool agreed
+    string decided_by
+    datetime decided_at
   }
   TASK {
     int task_id PK
@@ -352,16 +401,6 @@ erDiagram
     string reason
     json payload
   }
-  AI_CALL_LOG {
-    int call_id PK
-    int event_id FK
-    string chain "승인요약 소명검토 정정해석"
-    string model
-    json input
-    json output
-    bool verified
-    bool fallback_used
-  }
 
   AGENCY ||--o{ IDENTITY_ATTR : "식별정보"
   AGENCY ||--o{ DEPOSIT : "입금"
@@ -382,12 +421,16 @@ erDiagram
   REBATE_CLAIM ||--o{ APPROVAL_ITEM : "상신됨"
   REBATE_CLAIM ||--o{ EXPLANATION_REQUEST : "소명 요청"
   EXPLANATION_REQUEST ||--o{ EXPLANATION_REPLY : "회신"
+  EXPLANATION_REPLY ||--o{ EXPLANATION_CHECK : "주장 대조"
   REBATE_CLAIM ||--o{ OFFSET_PROPOSAL : "상계 제안"
   AR_ITEM ||--o{ OFFSET_PROPOSAL : "상계 대상"
   OFFSET_PROPOSAL ||--o{ AR_ADJUSTMENT : "잔액 조정"
   AR_ITEM ||--o{ AR_ADJUSTMENT : "조정됨"
   REBATE_CLAIM ||--o{ PAYMENT_ORDER : "지급 지시"
   PAYMENT_ORDER ||--o{ BANK_REPLY : "은행 회신"
+  REBATE_CLAIM ||--o{ AI_RECOMMENDATION : "검토 이력"
+  AI_RECOMMENDATION ||--o| APPROVAL_REQUEST : "상신 근거"
+  AI_RECOMMENDATION ||--o| EXPLANATION_REPLY : "소명 판단"
+  AI_RECOMMENDATION ||--o| OFFSET_PROPOSAL : "상계 추천"
   EVENT_LOG ||--o{ TASK : "작업 생성"
-  EVENT_LOG ||--o{ AI_CALL_LOG : "AI 호출"
 ```

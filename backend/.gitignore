@@ -1,0 +1,25 @@
+# --- 비밀 정보 ---
+# 키가 커밋되면 히스토리에 영구히 남는다. 사고 나면 키를 폐기·재발급해야 한다.
+.env
+.env.local
+*.key
+
+# --- 실행 중 생기는 DB ---
+# 앱이 켜질 때 원본 CSV로 다시 만든다. 커밋하지 않는다.
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# --- 파이썬 ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.log

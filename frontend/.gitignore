@@ -1,0 +1,9 @@
+# 설치 폴더는 각자 npm install 로 만든다.
+node_modules/
+
+# 빌드 결과물. AXHub가 직접 빌드하면 무시하고, 못 하면 이 줄을 지우고 커밋한다(02번에서 결정).
+dist/
+
+.env
+.env.local
+*.log
