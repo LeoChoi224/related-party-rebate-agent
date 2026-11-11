@@ -1,0 +1,8 @@
+version: axhub/v1
+name: related-party-rebate-agent
+runtime:
+  port: 8080
+  health_path: /api/health
+build:
+  deploy_method: docker
+  dockerfile: Dockerfile
