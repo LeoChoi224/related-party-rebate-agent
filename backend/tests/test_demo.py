@@ -21,6 +21,7 @@ EXPECTED_COUNTS = {
     "related_group": 1,
     "group_member": 3,
     "relation_edge": 4,
+    "event_log": 0,
 }
 
 

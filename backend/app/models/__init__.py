@@ -6,6 +6,7 @@ Base.metadata.create_all() 은 import 된 모델만 테이블로 만든다.
 
 from app.models.agency import Agency, Deposit, IdentityAttribute
 from app.models.base import Base
+from app.models.event_log import EventLog
 from app.models.rebate import RebateClaim
 from app.models.receivable import ARItem
 from app.models.related_party import (
@@ -20,6 +21,7 @@ __all__ = [
     "Agency",
     "Base",
     "Deposit",
+    "EventLog",
     "GroupMember",
     "GroupVersion",
     "IdentityAttribute",
