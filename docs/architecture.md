@@ -198,6 +198,10 @@ flowchart TD
 - `AR_ITEM` 은 원본 146행(대리점 채권 74 + 고객 채권 72)을 전부 저장한다. 고객 채권은 `customer_id` 만 있고 `agency_id` 는 비어 있다.
 - `IDENTITY_ATTR` 초기 행 = 대리점마다 대표자 · 주소 · 등록계좌 3행(`valid_from` = `registered_date`) + 입금마다 실입금계좌 1행(`valid_from` = `deposit_date`) = 150 + 32 = 182행.
 - `REBATE_CLAIM.status` 첫 값은 원본 상태에서 옮긴다: 승인 → 지급완료, 반려 → 반려, 미지급 → 미접수 **[가정]**. 원본 값은 `original_status` · `original_approver` · `original_payment_date` 에 그대로 남긴다.
+- **05 `feat/related-party-engine` 은 관련자 표 4개를 더한다**(`GROUP_VERSION` · `RELATED_GROUP` · `GROUP_MEMBER` · `RELATION_EDGE`). 버전 1 은 앱을 켤 때 시더 끝에서 계산한다. `trigger_change_id` 는 `MASTER_CHANGE` 와 함께 20 에서, `REBATE_CLAIM` 의 `min_authority` · `group_id` · `group_sum_krw` 는 한도 판정을 하는 06 에서 더한다.
+- 판정: 대표자 · 주소 · 계좌 중 2개 이상 같으면 관련자, 1개면 정황. **계좌는 속성 1개**로, 대리점의 등록계좌와 실입금계좌를 한 묶음으로 보고 묶음끼리 하나라도 겹치면 일치다. 지금 유효한 속성(`valid_to` 가 비어 있음)만, 문자열이 정확히 같을 때만 일치로 본다.
+- `RELATED_GROUP` 은 **2곳 이상 묶인 그룹만** 저장한다(원본 기준 G1 하나). 그룹이 없는 대리점은 자기 금액만으로 한도를 본다. 라벨은 그룹 안 가장 작은 `agency_id` 순으로 G1, G2 … 를 붙인다.
+- `RELATION_EDGE` 는 1개 이상 일치한 쌍만 저장한다(원본 기준 4쌍: 관련자 3 · 정황 1). `agency_a` 가 작은 ID 다. `matched_attrs` 는 일치한 속성마다 값과 양쪽 근거 행(`IDENTITY_ATTR.source_ref`)을 담는다.
 
 ```mermaid
 erDiagram
@@ -276,15 +280,15 @@ erDiagram
     string label "G1 등"
   }
   GROUP_MEMBER {
-    int group_id FK
-    string agency_id FK
+    int group_id PK, FK
+    string agency_id PK, FK
   }
   RELATION_EDGE {
     int edge_id PK
     int group_version_id FK
-    string agency_a FK
+    string agency_a FK "작은 ID"
     string agency_b FK
-    json matched_attrs "일치 속성과 근거 행"
+    json matched_attrs "속성마다 값과 양쪽 근거 행"
     int match_count
     string judgement "관련자 또는 정황"
   }
