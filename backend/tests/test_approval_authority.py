@@ -14,6 +14,7 @@ from app.services.approval_authority import (
     assess_period,
     current_group_of,
     decide_authority,
+    has_authority,
     required_authority,
 )
 from app.services.related_party import find_related_parties, save_group_version
@@ -53,6 +54,24 @@ def summary(decisions):
 def test_limit_is_two_million_inclusive(group_sum_krw, expected):
     """200만원 '이하'는 전결이다. 정각은 전결, 1원이라도 넘으면 영업임원."""
     assert required_authority(group_sum_krw) == expected
+
+
+@pytest.mark.parametrize(
+    ("role", "required", "expected"),
+    [
+        ("영업지원팀", "영업지원팀", True),
+        ("영업임원", "영업지원팀", True),
+        ("영업임원", "영업임원", True),
+        # 로드맵 09 완료 기준의 바탕: 영업지원팀은 영업임원 몫을 결정할 수 없다.
+        ("영업지원팀", "영업임원", False),
+        # 결재권자가 아닌 역할은 어떤 결재도 할 수 없다.
+        ("재무", "영업지원팀", False),
+        ("영업임원", "재무", False),
+    ],
+)
+def test_has_authority_follows_role_order(role, required, expected):
+    """결정하는 역할이 요구 역할 이상이어야 한다. 문자열 그대로 넣어도 된다."""
+    assert has_authority(role, required) is expected
 
 
 def test_group_claims_are_summed_together():

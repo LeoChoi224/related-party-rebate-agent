@@ -3,6 +3,7 @@
 지정한 대상월의 장려금 건을 모두 미접수 → 접수 → (한도 판정) → 관계확인 → 전결대기 /
 상신대기로 보낸다. 전부 한 트랜잭션이고 commit 은 요청 의존성(api/deps.py)이 한다.
 이미 처리한 달을 다시 접수하면 상태 머신이 막는다(InvalidTransitionError → 409).
+상신대기로 간 건은 판정 단위마다 승인 요청을 함께 만든다(09).
 AI 검토(claim_review 그래프)는 17 에서, 정황 소명 작업은 10 에서 붙인다.
 """
 
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import RebateClaim
 from app.models.enums import ApproverRole, ClaimStatus
+from app.services.approval import open_approval_requests
 from app.services.approval_authority import assess_period
 from app.services.claim_state import transition
 
@@ -73,6 +75,11 @@ def intake_period(session: Session, period_ym: str) -> dict[str, int]:
         )
 
     # 세션 안의 status 는 방금 넣은 enum 이라, 로그 · 응답이 한글만 보이게 str 로 바꾼다.
+    # 같은 트랜잭션에서 만들어, 상신대기인데 승인 요청이 없는 건이 생기지 않게 한다.
+    open_approval_requests(
+        session, [c for c in claims if c.status == ClaimStatus.AWAITING_EXECUTIVE]
+    )
+
     by_status = dict(Counter(str(claim.status) for claim in claims))
     logger.info("%s 장려금 %d건을 접수했습니다: %s", period_ym, len(claims), by_status)
     return by_status

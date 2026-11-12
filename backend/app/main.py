@@ -19,6 +19,7 @@ from app.api.router import api_router
 from app.core.config import FRONTEND_DIST
 from app.core.database import engine as default_engine
 from app.seed.seeder import reset_database
+from app.services.approval import InsufficientAuthorityError
 from app.services.claim_state import InvalidTransitionError
 
 
@@ -43,6 +44,13 @@ def invalid_transition_handler(
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
+def insufficient_authority_handler(
+    request: Request, exc: InsufficientAuthorityError
+) -> JSONResponse:
+    """결정하는 역할이 결재권자보다 낮으면 403 으로 돌려준다."""
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_app_logging()
@@ -57,8 +65,11 @@ def create_app(
     app = FastAPI(title="W07 판매장려금 통제 데스크", lifespan=lifespan)
     # 테스트는 임시 DB 엔진을 넣어 실제 app.db 를 건드리지 않는다.
     app.state.engine = engine
-    # 09 · 11 · 21 의 API 도 같은 예외를 내므로 라우트마다 잡지 않고 한 곳에 둔다.
+    # 전이 오류 409 · 권한 부족 403 은 여러 API 가 함께 내므로 라우트마다 잡지 않고 한 곳에 둔다.
     app.add_exception_handler(InvalidTransitionError, invalid_transition_handler)
+    app.add_exception_handler(
+        InsufficientAuthorityError, insufficient_authority_handler
+    )
     app.include_router(api_router)
 
     # 개발 중에는 화면을 Vite(5173)가 내보내므로 dist 가 없어도 API 는 떠야 한다.

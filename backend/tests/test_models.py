@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.core.database import make_engine
 from app.models import Agency, ARItem, Base, Deposit, IdentityAttribute, RebateClaim
-from app.models.enums import ApproverRole, ClaimStatus, IdentityAttrType, Provenance
+from app.models.enums import (
+    ApproverRole,
+    ClaimStatus,
+    Decision,
+    IdentityAttrType,
+    Provenance,
+)
 
 
 @pytest.fixture
@@ -53,9 +59,11 @@ def make_claim(agency_id: str = "D-011") -> RebateClaim:
 
 
 def test_create_all_makes_erd_tables(db_engine):
-    """create_all 하면 원본 5개 표, 관련자 표 4개, 이력 표가 ERD 이름 그대로 생긴다."""
+    """create_all 하면 원본 5개 표, 관련자 표 4개, 이력 표, 상신 표 2개가 ERD 이름 그대로 생긴다."""
     assert sorted(inspect(db_engine).get_table_names()) == [
         "agency",
+        "approval_item",
+        "approval_request",
         "ar_item",
         "deposit",
         "event_log",
@@ -81,6 +89,10 @@ def test_create_all_makes_erd_tables(db_engine):
         ("event_log", "payload", True),
         ("event_log", "from_status", False),
         ("event_log", "reason", False),
+        ("approval_request", "group_id", True),
+        ("approval_request", "decision", True),
+        ("approval_request", "decided_at", True),
+        ("approval_request", "approver_role", False),
         ("identity_attr", "valid_to", True),
         ("ar_item", "outstanding_krw", False),
         ("rebate_claim", "status", False),
@@ -110,6 +122,11 @@ def test_foreign_keys_point_to_parent_tables(db_engine):
         "group_id": "related_group",
     }
     assert fk_map("identity_attr") == {"agency_id": "agency"}
+    assert fk_map("approval_request") == {"group_id": "related_group"}
+    assert fk_map("approval_item") == {
+        "request_id": "approval_request",
+        "rebate_id": "rebate_claim",
+    }
 
 
 def test_rows_round_trip_with_korean_values(db_engine):
@@ -212,6 +229,7 @@ def test_enum_values_match_source_labels():
     assert {p.value for p in Provenance} == {"원본", "주장", "가정", "모의"}
     # 낮은 단계부터 적은 순서도 계약이다. 가드(17)가 이 순서로 높낮이를 본다.
     assert [r.value for r in ApproverRole] == ["영업지원팀", "영업임원"]
+    assert [d.value for d in Decision] == ["승인", "반려"]
     assert {a.value for a in IdentityAttrType} == {
         "대표자",
         "주소",
