@@ -54,6 +54,13 @@ class ApproverRole(StrEnum):
     SALES_EXECUTIVE = "영업임원"
 
 
+class Decision(StrEnum):
+    """결재권자가 고르는 결정. 건의 상태(ClaimStatus)와 글자는 같아도 뜻이 다르다."""
+
+    APPROVE = "승인"
+    REJECT = "반려"
+
+
 class MatchAttr(StrEnum):
     """관련자 판정에 세는 속성. 등록계좌와 실입금계좌는 '계좌' 하나로 센다."""
 

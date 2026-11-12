@@ -31,6 +31,8 @@ EXPECTED_COUNTS = {
     "group_member": 3,
     "relation_edge": 4,
     "event_log": 0,
+    "approval_request": 0,
+    "approval_item": 0,
 }
 G1 = ("D-011", "D-024", "D-037")
 

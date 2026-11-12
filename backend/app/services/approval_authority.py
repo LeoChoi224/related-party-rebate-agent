@@ -38,6 +38,18 @@ def required_authority(group_sum_krw: int) -> ApproverRole:
     return ApproverRole.SALES_EXECUTIVE
 
 
+def has_authority(role: str, required: str) -> bool:
+    """role 이 required 이상의 결재권자인지 답한다. 결재권자가 아닌 역할은 늘 거짓이다.
+
+    DB 나 요청 본문에서 온 문자열을 그대로 넣어도 된다(StrEnum 은 같은 글자와 같다).
+    AI 가드(17)도 이 함수로 "AI 판단이 최소 결재권자보다 낮은가"를 본다.
+    """
+    order = list(ApproverRole)
+    if role not in order or required not in order:
+        return False
+    return order.index(role) >= order.index(required)
+
+
 def decide_authority(
     claims: Iterable[RebateClaim], group_of: Mapping[str, int]
 ) -> list[AuthorityDecision]:

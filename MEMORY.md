@@ -9,16 +9,16 @@ Last updated: 2026-11-12
 - 원격: `origin` = Axhub 저장소(배포용, `main` push 시 자동 배포), `github` = GitHub `LeoChoi224/related-party-rebate-agent`(퍼블릭, PR 용). 라벨: GitHub 기본 10개 + `chore`.
 - axhub CLI v0.63.0(`~/.axhub/bin/axhub`, PATH 미등록) · 플러그인 axhub@axhub 1.43.0 · 로그인(leochoi224@gmail.com). lounge 테넌트 `c7a0a6fe-86c6-45f4-adc2-3ab7bd19ea36`.
 - AXHub 앱 `related-party-rebate-agent`(Docker, 앱 ID `6a0fd4bd-b4cf-45eb-865c-dff1dfd8047a`), 주소 https://related-party-rebate-agent-h6nw.axhub.app . 배포본 = `750dfd5`(01 최소 앱 + 02 배포 설정). **절전 중**(11/11 20:20 KST부터).
-- GitHub: PR #1(뼈대) ~ #7(07 상태 머신) 머지됨. `github/main` = `d827c54`.
-- 로컬: `main` = `d827c54`. 08 작업 브랜치 `feat/intake-june-batch` 는 사용자가 만들 차례(11/12 기준 아직 `main` 위). 로컬 `main` 의 upstream 은 `origin/main`(Axhub, `750dfd5`)이라 GitHub 머지분은 반드시 `git pull github main` 으로 받는다.
-- 로드맵 완료: 00 ~ 07. 04 = SQLite 원본 5개 표 · 시작 시 초기화 · `POST /api/demo/reset`. 05 = 관련자 판정(표 4개, 시더가 버전 1 저장). 06 = 한도 판정(`assess_period(session, period_ym)`). 07 = 상태 14개 · 전이표 · `transition`(이력 `event_log`, pytest 130개, `docs/architecture.md` 5장 상태도). 로컬 Docker 빌드는 미확인.
-- 08 `feat/intake-june-batch` Step 1~4 끝(세션 의존성 · 409 처리기 → 접수 서비스 → `POST /api/claims/intake?period=`). 11/12 Step 4 반영 · 검증(ruff 통과, pytest 149개, uvicorn 으로 200 · 409 · 404 · 422 · 초기화 뒤 200 확인), **커밋 전**(`main` 위 작업 폴더). 첫 업무 API.
+- GitHub: PR #1(뼈대) ~ #8(08 6월분 접수) 머지됨. `github/main` = `c3f7142`.
+- 로컬: `main` = `c3f7142`, 작업 브랜치 `feat/approval-request`(09). 로컬 `main` 의 upstream 은 `origin/main`(Axhub, `750dfd5`)이라 GitHub 머지분은 반드시 `git pull github main` 으로 받는다.
+- 로드맵 완료: 00 ~ 08. 04 = SQLite 원본 5개 표 · 시작 시 초기화 · `POST /api/demo/reset`. 05 = 관련자 판정(표 4개, 시더가 버전 1 저장). 06 = 한도 판정(`assess_period(session, period_ym)`). 07 = 상태 14개 · 전이표 · `transition`(이력 `event_log`, `docs/architecture.md` 5장 상태도). 08 = `POST /api/claims/intake?period=`(요청 = 트랜잭션, 전이 오류 409 처리기, pytest 149개). 로컬 Docker 빌드는 미확인.
+- 09 `feat/approval-request` Step 1~4 끝(결정 값 · 상신 표 2개 · `has_authority` → 결정 서비스 `services/approval.py` · 접수 때 요청 생성 → `POST /api/approvals/{id}/decision` · `POST /api/claims/{rebate_id}/decision` · 403 처리기). 11/13 Step 4 반영 · 검증(ruff 통과, pytest 180개, uvicorn 으로 403 · 422 · 200 · 409 · 전결 200 · 재무 403 · 상신 건 전결 409 확인), **커밋 전**. 초기화 행 수 13개 표.
 - 확인 숫자: agency 50 · identity_attr 182 · deposit 32 · ar_item 146 · rebate_claim 240, G1 6월 합산 3,888,097, 상태 지급완료 196 · 미접수 40 · 반려 4. 05: 일치 쌍 4(관련자 3 · 정황 1), 그룹 G1 하나. 06: 달마다 40건 · 판정 단위 38(단독 35 + G1), 한도 초과는 매달 G1 뿐(1~5월 4,870,186 · 4,540,341 · 4,055,114 · 4,267,112 · 4,505,596 = 22,238,349), 6월 영업임원 3 · 영업지원팀 37, 단독 최대 1,822,391(4월), 개별 최대 1,867,253.
 
 ## 다음에 할 일
 
-- 08 커밋 · 푸시 · PR (사용자, Git 명세서 11/12 전달: `git switch -c feat/intake-june-batch` → 코드 커밋 + 메모리 커밋 → `git push -u github feat/intake-june-batch`). 머지 뒤 `git switch main` → `git pull github main`.
-- 로드맵 09 `feat/approval-request`(상신 요청 생성 · 역할별 권한 확인 · 승인 / 반려 사유 필수. 완료 기준: 영업지원팀 역할로 상신 건 승인 거부) Step 1.
+- 09 커밋 · 푸시 · PR (사용자, Git 명세서 11/13 전달: 루트 이동 → 코드 커밋 + 문서 커밋 + 메모리 커밋 → `git push -u github feat/approval-request`). 머지 뒤 `git switch main` → `git pull github main`.
+- 로드맵 10 `feat/task-dispatcher`(상태가 바뀔 때 부서별 작업 자동 생성: 재무 지급 실행 · 영업지원 소명 요청 · 감사 재검토, 작업 상태 열림 → 진행 → 완료. 완료 기준: 승인이 나면 재무 작업이 생긴다) Step 1. 정황 D-034 · D-041 소명 작업도 여기서.
 - 배포 전 `axhub deploy check` 로 원본 COPY 가 들어간 Dockerfile 확인.
 - 제출 전 앱 `wake` 후 심사 기간 내내 켜 두기.
 
@@ -51,6 +51,8 @@ Last updated: 2026-11-12
 - 07 전이 결정(사용자 "기본안대로"): 전결대기 → 반려 허용(결재권이 있으면 반려도), 지급보류 → 소명대기 · 지급지시 둘 다(증빙 부족 · 계좌 오류 두 경로), 재검토필요는 돈이 안 나간 9개 상태에서만(지급지시 · 지급완료 · 상계완료 제외, 끝난 건은 감사 24)(11/12).
 - 08 접수 흐름: 대상월 건 전부 미접수 → 접수 → `assess_period` → 접수 → 관계확인(payload 에 그룹 · 합산 · 최소 결재권자) → 전결대기 / 상신대기. 요청 하나 = 트랜잭션 하나(`api/deps.py` 의 yield 세션 의존성, 정상이면 commit · 예외면 롤백 — FastAPI 0.141 에서 시험 확인). 세션 팩토리는 안 만듦(`app.state.engine` 사용). 처리자 "시스템"(역할은 12), 정황 작업은 10, AI 검토는 17(11/12).
 - 08 결정(사용자 "기본안대로"): 이미 처리한 달 재접수는 상태 머신이 막아 409(별도 검사 없음, 전체 롤백), 건이 없는 달 404, 형식 오류 422(`Query(pattern=…)`). 대상월은 쿼리 `?period=`. 응답은 요약 `{period_ym, received, by_status}`(건 목록은 13). `InvalidTransitionError` → 409 처리기를 `main.py` 에 전역 등록, `ValueError` 전체 → 422 는 안 함(버그를 입력 오류로 가림)(11/12).
+- 09 결정(사용자 "기본안대로"): ① 결정자 이름 · 역할은 결정 요청 **본문**(`actor` · `role`)에 — 헤더는 latin-1 이라 한글 역할에 영문 코드 표가 필요, 실제 시스템이면 로그인 토큰에서(면접 한계로 설명). ② 승인 요청은 08 접수 때 같은 트랜잭션에서 판정 단위별로 자동 생성(상신대기인데 요청 없는 상태 방지, R5 는 결정 자동화 금지일 뿐). ③ 전결 결정 API(건별)도 09 에 포함, 일괄 API 없음(26 이 반복 호출)(11/13).
+- 09 규칙: 권한 = `ApproverRole` 순서로 "요구 역할 이상", 결재권자 아닌 역할은 항상 부족 → 전용 예외 403 처리기. 반려 사유 필수는 Pydantic 스키마(422), 승인 사유는 선택(비면 역할 이름으로 이력 이유). 재결정은 상태 머신 409. 상신대기 건은 전결 결정 길로 결정 불가(409, 요청 기록 없는 승인 방지). `rec_id` 는 17, 승인 뒤 단계는 11 · 22, 반려 뒤 소명은 21, 상세 · 목록 조회는 13 · 14(11/13).
 - 파이썬 의존성은 leo-dev 설치 버전으로 고정(fastapi 0.141.1, uvicorn 0.52.1) — 로컬과 Docker 동일. 테스트 도구는 `requirements-dev.txt` 로 분리.
 - GitHub 이슈는 쓰지 않고 로드맵 번호 · 브랜치 이름으로 관리(1인 · 4일 일정). 저장소 퍼블릭 공개는 주최 측 허용(11/11).
 - 루트 `.gitignore`(기록 키 3줄)는 대회 규칙상 수정 금지 → 앱용 ignore 는 폴더별 파일, axhub 로컬 상태 `.axhub/` 는 `.git/info/exclude`.
