@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import make_engine
 from app.models import Agency, ARItem, Base, Deposit, IdentityAttribute, RebateClaim
-from app.models.enums import ClaimStatus, IdentityAttrType, Provenance
+from app.models.enums import ApproverRole, ClaimStatus, IdentityAttrType, Provenance
 
 
 @pytest.fixture
@@ -74,6 +74,9 @@ def test_create_all_makes_erd_tables(db_engine):
         ("ar_item", "customer_id", True),
         ("rebate_claim", "original_approver", True),
         ("rebate_claim", "original_payment_date", True),
+        ("rebate_claim", "min_authority", True),
+        ("rebate_claim", "group_id", True),
+        ("rebate_claim", "group_sum_krw", True),
         ("identity_attr", "valid_to", True),
         ("ar_item", "outstanding_krw", False),
         ("rebate_claim", "status", False),
@@ -87,7 +90,7 @@ def test_nullable_follows_mapped_type(db_engine, table, column, nullable):
 
 
 def test_foreign_keys_point_to_parent_tables(db_engine):
-    """입금은 대리점과 미수채권을, 나머지는 대리점을 가리킨다."""
+    """입금은 대리점과 미수채권을, 장려금은 대리점과 판정 당시 그룹을, 나머지는 대리점을 가리킨다."""
     inspector = inspect(db_engine)
 
     def fk_map(table: str) -> dict[str, str]:
@@ -98,7 +101,10 @@ def test_foreign_keys_point_to_parent_tables(db_engine):
 
     assert fk_map("deposit") == {"agency_id": "agency", "matched_ar_id": "ar_item"}
     assert fk_map("ar_item") == {"agency_id": "agency"}
-    assert fk_map("rebate_claim") == {"agency_id": "agency"}
+    assert fk_map("rebate_claim") == {
+        "agency_id": "agency",
+        "group_id": "related_group",
+    }
     assert fk_map("identity_attr") == {"agency_id": "agency"}
 
 
@@ -185,6 +191,8 @@ def test_enum_values_match_source_labels():
     """코드 값은 원본·화면에 쓰는 한글 표기와 같다."""
     assert {s.value for s in ClaimStatus} == {"미접수", "지급완료", "반려"}
     assert {p.value for p in Provenance} == {"원본", "주장", "가정", "모의"}
+    # 낮은 단계부터 적은 순서도 계약이다. 가드(17)가 이 순서로 높낮이를 본다.
+    assert [r.value for r in ApproverRole] == ["영업지원팀", "영업임원"]
     assert {a.value for a in IdentityAttrType} == {
         "대표자",
         "주소",
