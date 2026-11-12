@@ -1,7 +1,8 @@
 """SQLite 엔진.
 
 업무 DB 는 앱을 켤 때마다 원본으로 다시 만든다(app/seed/seeder.py).
-세션 팩토리와 요청마다 세션을 여는 의존성은 처음 조회 API 를 만드는 브랜치에서 추가한다.
+요청마다 세션을 여는 의존성은 app/api/deps.py 에 있다.
+엔진은 app.state.engine 으로 넘기므로 세션 팩토리는 두지 않는다.
 """
 
 from sqlalchemy import Engine, create_engine, event

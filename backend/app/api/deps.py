@@ -1,1 +1,22 @@
-"""라우터 공통 의존성: DB 세션, 현재 역할(영업지원팀·영업임원·재무·감사·시연 관리자) 확인."""
+"""라우터 공통 의존성.
+
+요청 하나 = 트랜잭션 하나: 정상으로 끝나면 commit, 예외가 나면 롤백한다.
+서비스(services/*)는 commit 하지 않고 이 트랜잭션 안에서 함께 확정 · 취소된다.
+현재 역할(영업지원팀 · 영업임원 · 재무 · 감사 · 시연 관리자) 확인은 12 에서 더한다.
+"""
+
+from collections.abc import Iterator
+from typing import Annotated
+
+from fastapi import Depends, Request
+from sqlalchemy.orm import Session
+
+
+def get_session(request: Request) -> Iterator[Session]:
+    """요청마다 세션과 트랜잭션을 연다. 라우트에서 난 예외는 yield 자리에서 다시 터진다."""
+    # 테스트가 create_app(engine=...) 으로 넣은 임시 엔진을 쓰려고 app.state 에서 꺼낸다.
+    with Session(request.app.state.engine) as session, session.begin():
+        yield session
+
+
+SessionDep = Annotated[Session, Depends(get_session)]

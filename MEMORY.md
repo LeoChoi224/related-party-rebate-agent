@@ -9,16 +9,16 @@ Last updated: 2026-11-12
 - 원격: `origin` = Axhub 저장소(배포용, `main` push 시 자동 배포), `github` = GitHub `LeoChoi224/related-party-rebate-agent`(퍼블릭, PR 용). 라벨: GitHub 기본 10개 + `chore`.
 - axhub CLI v0.63.0(`~/.axhub/bin/axhub`, PATH 미등록) · 플러그인 axhub@axhub 1.43.0 · 로그인(leochoi224@gmail.com). lounge 테넌트 `c7a0a6fe-86c6-45f4-adc2-3ab7bd19ea36`.
 - AXHub 앱 `related-party-rebate-agent`(Docker, 앱 ID `6a0fd4bd-b4cf-45eb-865c-dff1dfd8047a`), 주소 https://related-party-rebate-agent-h6nw.axhub.app . 배포본 = `750dfd5`(01 최소 앱 + 02 배포 설정). **절전 중**(11/11 20:20 KST부터).
-- GitHub: PR #1(뼈대) ~ #6(06 한도 판정) 머지됨. `github/main` = `965a07e`.
-- 로컬: `main` = `965a07e`. 07 작업 브랜치 `feat/claim-state-machine` 은 사용자가 만들 차례(11/12 기준 아직 `main` 위, 문서 · 메모리 수정분이 커밋 전). 로컬 `main` 의 upstream 은 `origin/main`(Axhub, `750dfd5`)이라 GitHub 머지분은 반드시 `git pull github main` 으로 받는다.
-- 로드맵 완료: 00 ~ 06. 04 = SQLite 원본 5개 표 · 시작 시 초기화 · `POST /api/demo/reset`. 05 = 관련자 판정(표 4개, 시더가 버전 1 저장). 06 = 한도 판정(`assess_period(session, period_ym)` 를 08 접수에서 부름, pytest 99개). 로컬 Docker 빌드는 미확인.
-- 07 `feat/claim-state-machine` Step 1~4 끝(상태 14개 · `event_log` 표 → 전이표 · `can_transition` → `transition`). 11/12 Step 4 반영 · 검증(ruff 통과, pytest 130개), **커밋 전**(아직 `main` 위에 반영돼 있어 커밋 전에 브랜치를 만들어야 함). 초기화 행 수 11개 표(`event_log: 0` 추가). `docs/architecture.md` 5장에 상태도.
+- GitHub: PR #1(뼈대) ~ #7(07 상태 머신) 머지됨. `github/main` = `d827c54`.
+- 로컬: `main` = `d827c54`. 08 작업 브랜치 `feat/intake-june-batch` 는 사용자가 만들 차례(11/12 기준 아직 `main` 위). 로컬 `main` 의 upstream 은 `origin/main`(Axhub, `750dfd5`)이라 GitHub 머지분은 반드시 `git pull github main` 으로 받는다.
+- 로드맵 완료: 00 ~ 07. 04 = SQLite 원본 5개 표 · 시작 시 초기화 · `POST /api/demo/reset`. 05 = 관련자 판정(표 4개, 시더가 버전 1 저장). 06 = 한도 판정(`assess_period(session, period_ym)`). 07 = 상태 14개 · 전이표 · `transition`(이력 `event_log`, pytest 130개, `docs/architecture.md` 5장 상태도). 로컬 Docker 빌드는 미확인.
+- 08 `feat/intake-june-batch` Step 1~4 끝(세션 의존성 · 409 처리기 → 접수 서비스 → `POST /api/claims/intake?period=`). 11/12 Step 4 반영 · 검증(ruff 통과, pytest 149개, uvicorn 으로 200 · 409 · 404 · 422 · 초기화 뒤 200 확인), **커밋 전**(`main` 위 작업 폴더). 첫 업무 API.
 - 확인 숫자: agency 50 · identity_attr 182 · deposit 32 · ar_item 146 · rebate_claim 240, G1 6월 합산 3,888,097, 상태 지급완료 196 · 미접수 40 · 반려 4. 05: 일치 쌍 4(관련자 3 · 정황 1), 그룹 G1 하나. 06: 달마다 40건 · 판정 단위 38(단독 35 + G1), 한도 초과는 매달 G1 뿐(1~5월 4,870,186 · 4,540,341 · 4,055,114 · 4,267,112 · 4,505,596 = 22,238,349), 6월 영업임원 3 · 영업지원팀 37, 단독 최대 1,822,391(4월), 개별 최대 1,867,253.
 
 ## 다음에 할 일
 
-- 07 커밋 · 푸시 · PR (사용자, Git 명세서 11/12 전달: `git switch -c feat/claim-state-machine` → 코드 커밋 + 상태도 커밋 + 메모리 커밋 → `git push -u github feat/claim-state-machine`). 머지 뒤 `git switch main` → `git pull github main`.
-- 로드맵 08 `feat/intake-june-batch`(`POST /api/claims/intake?period=2026-06` → 접수 → 관계확인 → `assess_period` → 전결대기 37 · 상신대기 3, `InvalidTransitionError` → 409 · `ValueError` → 422) Step 1.
+- 08 커밋 · 푸시 · PR (사용자, Git 명세서 11/12 전달: `git switch -c feat/intake-june-batch` → 코드 커밋 + 메모리 커밋 → `git push -u github feat/intake-june-batch`). 머지 뒤 `git switch main` → `git pull github main`.
+- 로드맵 09 `feat/approval-request`(상신 요청 생성 · 역할별 권한 확인 · 승인 / 반려 사유 필수. 완료 기준: 영업지원팀 역할로 상신 건 승인 거부) Step 1.
 - 배포 전 `axhub deploy check` 로 원본 COPY 가 들어간 Dockerfile 확인.
 - 제출 전 앱 `wake` 후 심사 기간 내내 켜 두기.
 
@@ -31,7 +31,7 @@ Last updated: 2026-11-12
 - SQLite 는 앱 시작 시 원본 CSV로 다시 만든다(컨테이너 파일은 재배포 · 재시작 때 초기화, 시연 초기화와 같은 동작).
 - AI: 판단 · 추천은 AI(LangGraph 그래프 3개: claim_review · explanation_review · master_change_parser), 최종 결정은 사람. AI 는 결재 단계를 올릴 수만 있음(코드 가드). 업무 상태는 DB 한 곳.
 - 필수 확장 = 지급 전 미수채권 대조 · 상계 [가정]. 다른 부서 영향 = 재무(채권 회수) · 영업(대리점 관계) · 감사(사후 검토).
-- 진행 방식: Step 1→2→3 은 블록으로 받아 대조, **Step 4 에서 Claude 가 정답(메인 · 테스트)을 파일에 반영하고 Git 명세서를 준다**(11/11). 확인 명령은 Step 2 · 3 에 넣지 않고 Step 4 에서 Git 명세서 위에 한 번에(11/12). 커밋 · 푸시와 코드를 올리는 axhub 명령은 사용자가 직접.
+- 진행 방식: Step 1→2→3 은 블록으로 받아 대조, **Step 4 에서 Claude 가 정답(메인 · 테스트)을 파일에 반영하고 Git 명세서를 준다**(11/11). 확인 명령은 Step 2 · 3 에 넣지 않고 Step 4 에서 Git 명세서 위에 한 번에(11/12). 사용자는 Step 1 의 브랜치 명령을 바로 치지 않고 Step 4 명세서에서 만든다 → `main` 위면 명세서 ① 에 `git switch -c`(07 · 08). 커밋 · 푸시와 코드를 올리는 axhub 명령은 사용자가 직접.
 - 원본 로더: pandas 대신 표준 `csv` + Pydantic(행마다 출처 · 오류 위치 · 빈 값/열 개수 검사, 이미지 크기). `period_ym` 은 문자열, `NONE` 은 None, 틀린 행은 건너뛰지 않고 멈춤. 미수채권은 146행 전부 읽고 대리점 필터는 쓰는 쪽에서.
 - 04 DB 범위: 원본 5개 표만(AGENCY · IDENTITY_ATTR · DEPOSIT · AR_ITEM · REBATE_CLAIM), 나머지 표는 처음 쓰는 브랜치에서. DB 는 켤 때마다 새로 만들어 마이그레이션 불필요(11/12).
 - AR_ITEM 은 미수채권 146행 전부 저장. `customer_id` 추가, 고객 채권은 `agency_id` 가 비어 있음(11/12).
@@ -49,6 +49,8 @@ Last updated: 2026-11-12
 - 06 규칙: 월 = 대상월 `period_ym`(6월분은 지급일 없음, 지급된 196건은 모두 다음 달 지급이라 결과 같음). 반려 건은 합산 제외(규정 기준이 "지급액"). 2,000,000원 이하 전결 · 초과 영업임원. 지금 버전 그룹 단위, 단독은 자기 금액. 상태는 안 바꿈(07 · 08). 결재권자 역할 enum 은 06 에서(04 docstring 의 "07" 정정). AI 가드 · API 는 범위 밖(17 · 08 · 13)(11/12).
 - 07 상태 머신: 상태 14개(미접수 · 접수 · 관계확인 · 전결대기 · 상신대기 · 소명대기 · 지급보류 · 승인 · 반려 · 상계검토 · 지급지시 · 지급완료 · 상계완료 · 재검토필요). 전이표는 dict 데이터(라이브러리 안 씀 — 필요한 게 표 하나, requirements 변경 불필요). 확인 → 변경 → EventLog 를 한 함수에서, commit 안 함. 이유 필수, 같은 상태 전이 금지, 예외 `InvalidTransitionError`(API 409 는 08). 시더는 이력 안 남김(초기화 행 수에 event_log 0). 역할 권한은 09, `actor_role` 은 일단 문자열(11/12).
 - 07 전이 결정(사용자 "기본안대로"): 전결대기 → 반려 허용(결재권이 있으면 반려도), 지급보류 → 소명대기 · 지급지시 둘 다(증빙 부족 · 계좌 오류 두 경로), 재검토필요는 돈이 안 나간 9개 상태에서만(지급지시 · 지급완료 · 상계완료 제외, 끝난 건은 감사 24)(11/12).
+- 08 접수 흐름: 대상월 건 전부 미접수 → 접수 → `assess_period` → 접수 → 관계확인(payload 에 그룹 · 합산 · 최소 결재권자) → 전결대기 / 상신대기. 요청 하나 = 트랜잭션 하나(`api/deps.py` 의 yield 세션 의존성, 정상이면 commit · 예외면 롤백 — FastAPI 0.141 에서 시험 확인). 세션 팩토리는 안 만듦(`app.state.engine` 사용). 처리자 "시스템"(역할은 12), 정황 작업은 10, AI 검토는 17(11/12).
+- 08 결정(사용자 "기본안대로"): 이미 처리한 달 재접수는 상태 머신이 막아 409(별도 검사 없음, 전체 롤백), 건이 없는 달 404, 형식 오류 422(`Query(pattern=…)`). 대상월은 쿼리 `?period=`. 응답은 요약 `{period_ym, received, by_status}`(건 목록은 13). `InvalidTransitionError` → 409 처리기를 `main.py` 에 전역 등록, `ValueError` 전체 → 422 는 안 함(버그를 입력 오류로 가림)(11/12).
 - 파이썬 의존성은 leo-dev 설치 버전으로 고정(fastapi 0.141.1, uvicorn 0.52.1) — 로컬과 Docker 동일. 테스트 도구는 `requirements-dev.txt` 로 분리.
 - GitHub 이슈는 쓰지 않고 로드맵 번호 · 브랜치 이름으로 관리(1인 · 4일 일정). 저장소 퍼블릭 공개는 주최 측 허용(11/11).
 - 루트 `.gitignore`(기록 키 3줄)는 대회 규칙상 수정 금지 → 앱용 ignore 는 폴더별 파일, axhub 로컬 상태 `.axhub/` 는 `.git/info/exclude`.

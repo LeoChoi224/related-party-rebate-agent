@@ -11,14 +11,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import Engine
 
 from app.api.router import api_router
 from app.core.config import FRONTEND_DIST
 from app.core.database import engine as default_engine
 from app.seed.seeder import reset_database
+from app.services.claim_state import InvalidTransitionError
 
 
 def configure_app_logging() -> None:
@@ -35,6 +36,13 @@ def configure_app_logging() -> None:
     app_logger.setLevel(logging.INFO)
 
 
+def invalid_transition_handler(
+    request: Request, exc: InvalidTransitionError
+) -> JSONResponse:
+    """상태 전이표에 없는 전이는 요청이 지금 상태와 충돌한 것이라 409 로 돌려준다."""
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_app_logging()
@@ -49,6 +57,8 @@ def create_app(
     app = FastAPI(title="W07 판매장려금 통제 데스크", lifespan=lifespan)
     # 테스트는 임시 DB 엔진을 넣어 실제 app.db 를 건드리지 않는다.
     app.state.engine = engine
+    # 09 · 11 · 21 의 API 도 같은 예외를 내므로 라우트마다 잡지 않고 한 곳에 둔다.
+    app.add_exception_handler(InvalidTransitionError, invalid_transition_handler)
     app.include_router(api_router)
 
     # 개발 중에는 화면을 Vite(5173)가 내보내므로 dist 가 없어도 API 는 떠야 한다.
