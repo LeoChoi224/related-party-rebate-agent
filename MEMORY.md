@@ -9,17 +9,17 @@ Last updated: 2026-11-12
 - 원격: `origin` = Axhub 저장소(배포용, `main` push 시 자동 배포), `github` = GitHub `LeoChoi224/related-party-rebate-agent`(퍼블릭, PR 용). 라벨: GitHub 기본 10개 + `chore`.
 - axhub CLI v0.63.0(`~/.axhub/bin/axhub`, PATH 미등록) · 플러그인 axhub@axhub 1.43.0 · 로그인(leochoi224@gmail.com). lounge 테넌트 `c7a0a6fe-86c6-45f4-adc2-3ab7bd19ea36`.
 - AXHub 앱 `related-party-rebate-agent`(Docker, 앱 ID `6a0fd4bd-b4cf-45eb-865c-dff1dfd8047a`), 주소 https://related-party-rebate-agent-h6nw.axhub.app . 배포본 = `750dfd5`(01 최소 앱 + 02 배포 설정). **절전 중**(11/11 20:20 KST부터).
-- GitHub: PR #1(뼈대) · PR #2(01·02 + 메모리) · PR #3(03 로더 + 메모리) 머지됨. `github/main` = `30973de`.
-- 로컬: `main` · `feat/db-schema` 둘 다 `30973de`(11/12 fast-forward). `feat/db-schema` 에 04 커밋은 아직 없음.
-- 로드맵 완료: 00 · 01 · 02 · 03. 04 `feat/db-schema` 는 Step 1~4 끝(DB 연결 → 모델 5개 → 시더 → lifespan · `POST /api/demo/reset`). 11/12 Step 4 반영 · 검증 완료(ruff 통과, pytest 60개), **커밋 전**. 로컬 Docker 빌드는 미확인.
-- 04 설정 변경(승인 받고 Claude 가 작성): `backend/requirements.txt` 에 `sqlalchemy==2.0.51`, `Dockerfile` 의 `COPY backend/` 아래에 원본 `01_corevia` 폴더 COPY.
-- 04 확인 숫자: agency 50 · identity_attr 182 · deposit 32 · ar_item 146 · rebate_claim 240, G1 6월 합산 3,888,097, 상태 지급완료 196 · 미접수 40 · 반려 4.
+- GitHub: PR #1(뼈대) · #2(01·02) · #3(03 로더) · #4(04 DB 스키마) 머지됨. `github/main` = `e8ee7f1`.
+- 로컬: `main` = `e8ee7f1`(11/12 pull), 작업 브랜치 `feat/related-party-engine`(05) 생성. 로컬 `main` 의 upstream 은 `origin/main`(Axhub, `750dfd5`)이라 GitHub 머지분은 반드시 `git pull github main` 으로 받는다.
+- 로드맵 완료: 00 ~ 04. 04 = SQLite 원본 5개 표 · 시작 시 초기화 · `POST /api/demo/reset`(pytest 60개). 로컬 Docker 빌드는 미확인.
+- 05 `feat/related-party-engine` Step 1~4 끝(표 4개 → 판정 순수 함수 → 버전 저장 · 시더 연결). 11/12 Step 4 반영 · 검증(ruff 통과, pytest 79개), **커밋 전**. 초기화 행 수 9개 표(group_version 1 · related_group 1 · group_member 3 · relation_edge 4 추가).
+- 확인 숫자: agency 50 · identity_attr 182 · deposit 32 · ar_item 146 · rebate_claim 240, G1 6월 합산 3,888,097, 상태 지급완료 196 · 미접수 40 · 반려 4. 05: 일치 쌍 4(관련자 3 · 정황 1), 그룹 G1 하나.
 
 ## 다음에 할 일
 
-- 04 커밋 · 푸시 · PR (사용자, Git 명세서 11/12 전달: 코드 커밋 + 메모리 · 문서 커밋 2개 → `git push -u github feat/db-schema`). 머지 뒤 `main` 에서 `git pull github main`.
+- 05 커밋 · 푸시 · PR (사용자, Git 명세서 11/12 전달: 코드 커밋 + ERD 커밋 + 메모리 커밋 → `git push -u github feat/related-party-engine`). 머지 뒤 `git switch main` → `git pull github main`.
+- 로드맵 06 `feat/approval-authority`(그룹 월 합산 → 최소 결재권자, `REBATE_CLAIM` 에 `min_authority` · `group_id` · `group_sum_krw` 추가) Step 1.
 - 배포 전 `axhub deploy check` 로 원본 COPY 가 들어간 Dockerfile 확인.
-- 로드맵 05(판정 엔진, min_authority · group 컬럼 추가) Step 1.
 - 제출 전 앱 `wake` 후 심사 기간 내내 켜 두기.
 
 ## 결정과 근거
@@ -41,13 +41,17 @@ Last updated: 2026-11-12
 - 시더는 상태 변환 · 원본 읽기를 `drop_all` 앞에서 끝낸다 → 원본이 틀리면 기존 DB 가 그대로 남는다. 앱은 시작 실패로 드러난다(11/12).
 - 로그: `app` 로거만 INFO 로 연다. 루트를 INFO 로 올리면 httpx 요청 로그가 섞인다(SQLAlchemy 는 스스로 WARNING 고정이라 이유가 아님)(11/12).
 - `database.py` 는 엔진만. 세션 팩토리 · 요청별 세션 의존성은 처음 조회 API 를 만드는 브랜치에서(뼈대와 다름, 11/12).
+- 05 관련자 판정: 계좌는 속성 1개(등록 + 실입금 묶음이 하나라도 겹치면 일치, 따로 세면 공유계좌 하나로 "2개 일치"가 됨). 지금 유효한 속성만, 정확한 문자열 비교. 원본에 공백 · 표기 차이 없음 확인(11/12).
+- 05 그룹: 2곳 이상 묶인 것만 저장(단독 47곳은 그룹 없음 → 06 은 자기 금액). 라벨 G1… 은 최소 agency_id 순. 버전 1 은 시더 끝에서 계산 → 초기화 행 수에 표 4개 추가(11/12).
+- 05 범위: 엔진 + 표 4개만. API 는 14(건 상세 화면)에서, `REBATE_CLAIM` 그룹 · 결재권자 컬럼은 06, `trigger_change_id` 는 20. 계산(순수 함수)과 저장을 나눠 20 정정 때 재사용(11/12).
+- 05 구현: 쌍은 `itertools.combinations` 로 전부 비교(1,225쌍, 규모가 커지면 값 → 대리점 역색인), 전이 묶기는 유니온-파인드. `save_group_version` 은 commit 하지 않음(20 에서 정정과 재계산을 한 트랜잭션으로). 시더 행 수는 `Base.metadata.sorted_tables` 로 DB 에서 센다(11/12).
 - 파이썬 의존성은 leo-dev 설치 버전으로 고정(fastapi 0.141.1, uvicorn 0.52.1) — 로컬과 Docker 동일. 테스트 도구는 `requirements-dev.txt` 로 분리.
 - GitHub 이슈는 쓰지 않고 로드맵 번호 · 브랜치 이름으로 관리(1인 · 4일 일정). 저장소 퍼블릭 공개는 주최 측 허용(11/11).
 - 루트 `.gitignore`(기록 키 3줄)는 대회 규칙상 수정 금지 → 앱용 ignore 는 폴더별 파일, axhub 로컬 상태 `.axhub/` 는 `.git/info/exclude`.
 
 ## 자주 쓰는 원본 사실
 
-- 관련자 그룹 G1 = D-011 · D-024 · D-037 (D-024 실입금계좌 = G1 공유계좌 국민 412-27-556310, DP-00013 · 14 = 원본 14 · 15행).
+- 관련자 그룹 G1 = D-011 · D-024 · D-037 (D-024 실입금계좌 = G1 공유계좌 국민 412-27-556310, DP-00013 · 14 = 원본 14 · 15행). 이 2건이 원본에서 등록계좌와 다른 유일한 입금. 실입금계좌를 빼면 D-024–D-037 은 대표자만 일치(정황)지만 G1 은 전이로 그대로.
 - G1 6월분 합산 3,888,097원 → 영업임원 상신 대상. 6월분 40건 `미지급` = 기준일(7/1) 처리할 일.
 - 1~5월 G1 15건 22,238,349원이 영업지원팀 전결로 지급됨(한도 200만원 우회).
 - G1 미수채권 48,481,080원(120일 넘은 연체 5건). D-034–D-041 은 대표자만 일치 → 정황.
