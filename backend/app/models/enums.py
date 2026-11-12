@@ -2,7 +2,7 @@
 
 DB 에는 한글 값 그대로 문자열로 저장한다. StrEnum 은 문자열과 같게 비교되므로
 String 컬럼에 그대로 넣고 꺼내도 된다.
-장려금 건의 나머지 상태와 결재권자 역할은 07(상태 머신)에서 더한다.
+장려금 건의 나머지 상태는 07(상태 머신)에서 더한다.
 """
 
 from enum import StrEnum
@@ -32,6 +32,13 @@ class ClaimStatus(StrEnum):
     NOT_RECEIVED = "미접수"
     PAID = "지급완료"
     REJECTED = "반려"
+
+
+class ApproverRole(StrEnum):
+    """장려금 결재권자. 낮은 단계부터 적는다."""
+
+    SALES_SUPPORT = "영업지원팀"
+    SALES_EXECUTIVE = "영업임원"
 
 
 class MatchAttr(StrEnum):
