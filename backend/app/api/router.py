@@ -5,10 +5,11 @@ routes 아래 라우터를 모아 /api 접두사로 묶는다. 새 라우터는 
 
 from fastapi import APIRouter
 
-from app.api.routes import approvals, claims, demo, health
+from app.api.routes import approvals, claims, demo, health, tasks
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
 api_router.include_router(demo.router)
 api_router.include_router(claims.router)
 api_router.include_router(approvals.router)
+api_router.include_router(tasks.router)

@@ -61,6 +61,22 @@ class Decision(StrEnum):
     REJECT = "반려"
 
 
+class Department(StrEnum):
+    """작업을 받는 부서. 역할 이름과 같게 써서 역할 화면에서 그대로 거른다."""
+
+    FINANCE = "재무"
+    SALES_SUPPORT = "영업지원팀"
+    AUDIT = "내부감사"
+
+
+class TaskStatus(StrEnum):
+    """부서별 작업 상태. 열림에서 바로 완료로 갈 수도 있다."""
+
+    OPEN = "열림"
+    IN_PROGRESS = "진행"
+    DONE = "완료"
+
+
 class MatchAttr(StrEnum):
     """관련자 판정에 세는 속성. 등록계좌와 실입금계좌는 '계좌' 하나로 센다."""
 

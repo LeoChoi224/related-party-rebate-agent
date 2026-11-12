@@ -24,6 +24,7 @@ EXPECTED_COUNTS = {
     "event_log": 0,
     "approval_request": 0,
     "approval_item": 0,
+    "task": 0,
 }
 
 

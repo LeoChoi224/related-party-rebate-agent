@@ -1,7 +1,8 @@
 """장려금 건 상태 머신.
 
 전이표(ALLOWED_TRANSITIONS)는 데이터이고, docs/architecture.md 5장 그림과 같다.
-허용 여부 확인 → 상태 변경 → EventLog 한 줄이 transition 한 함수에서 함께 일어난다.
+허용 여부 확인 → 상태 변경 → EventLog 한 줄 → 부서별 작업(task_dispatcher)이
+transition 한 함수에서 함께 일어난다.
 그래프의 apply 노드와 API 는 상태를 바꿀 때 반드시 여기를 거친다.
 누가 어떤 전이를 할 수 있는지(역할 권한)는 09 에서 이 함수를 부르기 전에 검사한다.
 """
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models import EventLog, RebateClaim
 from app.models.enums import ClaimStatus as S
+from app.services.task_dispatcher import on_claim_transition
 
 # 재검토필요(마스터 정정 · 그룹 버전 변경)로 갈 수 있는 상태: 아직 돈이 나가지 않은 것.
 # 지급지시는 은행에 보낸 지시를 되돌릴 수 없고, 지급완료 · 상계완료는 끝난 건이라 뺀다.
@@ -82,6 +84,7 @@ def transition(
     """허용된 전이만 통과시키고, 상태를 바꾸고, 이력 한 줄을 남긴다. commit 하지 않는다.
 
     역할 권한은 검사하지 않는다(09 가 이 함수를 부르기 전에 한다).
+    이력을 남긴 뒤 부서별 작업을 배정한다(10).
     """
     # 입력이 빠진 것은 상태 규칙 위반이 아니라 입력 오류라 예외 종류를 나눈다(API 422).
     if not actor.strip() or not reason.strip():
@@ -108,5 +111,7 @@ def transition(
     )
     claim.status = to_status
     session.add(event)
+    # 작업이 이 이력 번호를 가리키므로 flush 로 event_id 를 먼저 받는다.
     session.flush()
+    on_claim_transition(session, claim, event)
     return event
