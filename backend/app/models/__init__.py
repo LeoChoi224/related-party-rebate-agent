@@ -16,6 +16,7 @@ from app.models.related_party import (
     RelatedGroup,
     RelationEdge,
 )
+from app.models.task import Task
 
 __all__ = [
     "ARItem",
@@ -31,4 +32,5 @@ __all__ = [
     "RebateClaim",
     "RelatedGroup",
     "RelationEdge",
+    "Task",
 ]

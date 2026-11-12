@@ -13,8 +13,10 @@ from app.models.enums import (
     ApproverRole,
     ClaimStatus,
     Decision,
+    Department,
     IdentityAttrType,
     Provenance,
+    TaskStatus,
 )
 
 
@@ -59,7 +61,7 @@ def make_claim(agency_id: str = "D-011") -> RebateClaim:
 
 
 def test_create_all_makes_erd_tables(db_engine):
-    """create_all 하면 원본 5개 표, 관련자 표 4개, 이력 표, 상신 표 2개가 ERD 이름 그대로 생긴다."""
+    """create_all 하면 지금까지 만든 ERD 표가 이름 그대로 모두 생긴다."""
     assert sorted(inspect(db_engine).get_table_names()) == [
         "agency",
         "approval_item",
@@ -73,6 +75,7 @@ def test_create_all_makes_erd_tables(db_engine):
         "rebate_claim",
         "related_group",
         "relation_edge",
+        "task",
     ]
 
 
@@ -93,6 +96,10 @@ def test_create_all_makes_erd_tables(db_engine):
         ("approval_request", "decision", True),
         ("approval_request", "decided_at", True),
         ("approval_request", "approver_role", False),
+        ("task", "trigger_status", True),
+        ("task", "created_by_event", True),
+        ("task", "closed_at", True),
+        ("task", "detail", False),
         ("identity_attr", "valid_to", True),
         ("ar_item", "outstanding_krw", False),
         ("rebate_claim", "status", False),
@@ -127,6 +134,7 @@ def test_foreign_keys_point_to_parent_tables(db_engine):
         "request_id": "approval_request",
         "rebate_id": "rebate_claim",
     }
+    assert fk_map("task") == {"created_by_event": "event_log"}
 
 
 def test_rows_round_trip_with_korean_values(db_engine):
@@ -230,6 +238,9 @@ def test_enum_values_match_source_labels():
     # 낮은 단계부터 적은 순서도 계약이다. 가드(17)가 이 순서로 높낮이를 본다.
     assert [r.value for r in ApproverRole] == ["영업지원팀", "영업임원"]
     assert [d.value for d in Decision] == ["승인", "반려"]
+    # 부서는 역할 화면에서 그대로 거를 수 있게 역할 이름과 같다.
+    assert [d.value for d in Department] == ["재무", "영업지원팀", "내부감사"]
+    assert [s.value for s in TaskStatus] == ["열림", "진행", "완료"]
     assert {a.value for a in IdentityAttrType} == {
         "대표자",
         "주소",

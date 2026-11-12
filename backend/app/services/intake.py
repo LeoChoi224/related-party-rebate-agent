@@ -4,7 +4,8 @@
 상신대기로 보낸다. 전부 한 트랜잭션이고 commit 은 요청 의존성(api/deps.py)이 한다.
 이미 처리한 달을 다시 접수하면 상태 머신이 막는다(InvalidTransitionError → 409).
 상신대기로 간 건은 판정 단위마다 승인 요청을 함께 만든다(09).
-AI 검토(claim_review 그래프)는 17 에서, 정황 소명 작업은 10 에서 붙인다.
+정황 관계 대리점의 건은 영업지원팀 소명 요청 작업을 만든다(R3, 지급은 막지 않는다).
+AI 검토(claim_review 그래프)는 17 에서 붙인다.
 """
 
 import logging
@@ -18,6 +19,7 @@ from app.models.enums import ApproverRole, ClaimStatus
 from app.services.approval import open_approval_requests
 from app.services.approval_authority import assess_period
 from app.services.claim_state import transition
+from app.services.task_dispatcher import open_circumstantial_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,9 @@ def intake_period(session: Session, period_ym: str) -> dict[str, int]:
     open_approval_requests(
         session, [c for c in claims if c.status == ClaimStatus.AWAITING_EXECUTIVE]
     )
+
+    # R3: 정황은 지급을 막지 않고 소명 요청 작업만 연다.
+    open_circumstantial_tasks(session, claims)
 
     by_status = dict(Counter(str(claim.status) for claim in claims))
     logger.info("%s 장려금 %d건을 접수했습니다: %s", period_ym, len(claims), by_status)
