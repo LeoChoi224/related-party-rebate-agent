@@ -9,16 +9,16 @@ Last updated: 2026-11-12
 - 원격: `origin` = Axhub 저장소(배포용, `main` push 시 자동 배포), `github` = GitHub `LeoChoi224/related-party-rebate-agent`(퍼블릭, PR 용). 라벨: GitHub 기본 10개 + `chore`.
 - axhub CLI v0.63.0(`~/.axhub/bin/axhub`, PATH 미등록) · 플러그인 axhub@axhub 1.43.0 · 로그인(leochoi224@gmail.com). lounge 테넌트 `c7a0a6fe-86c6-45f4-adc2-3ab7bd19ea36`.
 - AXHub 앱 `related-party-rebate-agent`(Docker, 앱 ID `6a0fd4bd-b4cf-45eb-865c-dff1dfd8047a`), 주소 https://related-party-rebate-agent-h6nw.axhub.app . 배포본 = `750dfd5`(01 최소 앱 + 02 배포 설정). **절전 중**(11/11 20:20 KST부터).
-- GitHub: PR #1(뼈대) · #2(01·02) · #3(03 로더) · #4(04 DB 스키마) 머지됨. `github/main` = `e8ee7f1`.
-- 로컬: `main` = `e8ee7f1`(11/12 pull), 작업 브랜치 `feat/related-party-engine`(05) 생성. 로컬 `main` 의 upstream 은 `origin/main`(Axhub, `750dfd5`)이라 GitHub 머지분은 반드시 `git pull github main` 으로 받는다.
-- 로드맵 완료: 00 ~ 04. 04 = SQLite 원본 5개 표 · 시작 시 초기화 · `POST /api/demo/reset`(pytest 60개). 로컬 Docker 빌드는 미확인.
-- 05 `feat/related-party-engine` Step 1~4 끝(표 4개 → 판정 순수 함수 → 버전 저장 · 시더 연결). 11/12 Step 4 반영 · 검증(ruff 통과, pytest 79개), **커밋 전**. 초기화 행 수 9개 표(group_version 1 · related_group 1 · group_member 3 · relation_edge 4 추가).
-- 확인 숫자: agency 50 · identity_attr 182 · deposit 32 · ar_item 146 · rebate_claim 240, G1 6월 합산 3,888,097, 상태 지급완료 196 · 미접수 40 · 반려 4. 05: 일치 쌍 4(관련자 3 · 정황 1), 그룹 G1 하나.
+- GitHub: PR #1(뼈대) · #2(01·02) · #3(03 로더) · #4(04 DB 스키마) · #5(05 관련자 엔진) 머지됨. `github/main` = `b65e426`.
+- 로컬: `main` = `b65e426`, 작업 브랜치 `feat/approval-authority`(06). 로컬 `main` 의 upstream 은 `origin/main`(Axhub, `750dfd5`)이라 GitHub 머지분은 반드시 `git pull github main` 으로 받는다. CLAUDE.md · MEMORY.md 수정분(확인 명령 규칙 등)이 커밋 전.
+- 로드맵 완료: 00 ~ 05. 04 = SQLite 원본 5개 표 · 시작 시 초기화 · `POST /api/demo/reset`. 05 = 관련자 판정(표 4개, 시더가 버전 1 저장, pytest 79개). 로컬 Docker 빌드는 미확인.
+- 06 `feat/approval-authority` Step 1~4 끝(역할 enum · 컬럼 3개 → 판정 순수 함수 → 대상월 판정 저장). 11/12 Step 4 반영 · 검증(ruff 통과, pytest 99개), **커밋 전**. 서비스 `assess_period(session, period_ym)` 를 08 접수에서 부른다.
+- 확인 숫자: agency 50 · identity_attr 182 · deposit 32 · ar_item 146 · rebate_claim 240, G1 6월 합산 3,888,097, 상태 지급완료 196 · 미접수 40 · 반려 4. 05: 일치 쌍 4(관련자 3 · 정황 1), 그룹 G1 하나. 06: 달마다 40건 · 판정 단위 38(단독 35 + G1), 한도 초과는 매달 G1 뿐(1~5월 4,870,186 · 4,540,341 · 4,055,114 · 4,267,112 · 4,505,596 = 22,238,349), 6월 영업임원 3 · 영업지원팀 37, 단독 최대 1,822,391(4월), 개별 최대 1,867,253.
 
 ## 다음에 할 일
 
-- 05 커밋 · 푸시 · PR (사용자, Git 명세서 11/12 전달: 코드 커밋 + ERD 커밋 + 메모리 커밋 → `git push -u github feat/related-party-engine`). 머지 뒤 `git switch main` → `git pull github main`.
-- 로드맵 06 `feat/approval-authority`(그룹 월 합산 → 최소 결재권자, `REBATE_CLAIM` 에 `min_authority` · `group_id` · `group_sum_krw` 추가) Step 1.
+- 06 커밋 · 푸시 · PR (사용자, Git 명세서 11/12 전달: 코드 커밋 + ERD 커밋 + 규칙 · 메모리 커밋 → `git push -u github feat/approval-authority`). 머지 뒤 `git switch main` → `git pull github main`.
+- 로드맵 07 `feat/claim-state-machine`(접수 → 관계확인 → 전결대기 / 상신대기 … 허용 전이만 통과, 전이마다 EventLog) Step 1.
 - 배포 전 `axhub deploy check` 로 원본 COPY 가 들어간 Dockerfile 확인.
 - 제출 전 앱 `wake` 후 심사 기간 내내 켜 두기.
 
@@ -31,7 +31,7 @@ Last updated: 2026-11-12
 - SQLite 는 앱 시작 시 원본 CSV로 다시 만든다(컨테이너 파일은 재배포 · 재시작 때 초기화, 시연 초기화와 같은 동작).
 - AI: 판단 · 추천은 AI(LangGraph 그래프 3개: claim_review · explanation_review · master_change_parser), 최종 결정은 사람. AI 는 결재 단계를 올릴 수만 있음(코드 가드). 업무 상태는 DB 한 곳.
 - 필수 확장 = 지급 전 미수채권 대조 · 상계 [가정]. 다른 부서 영향 = 재무(채권 회수) · 영업(대리점 관계) · 감사(사후 검토).
-- 진행 방식: Step 1→2→3 은 블록으로 받아 대조, **Step 4 에서 Claude 가 정답(메인 · 테스트)을 파일에 반영하고 Git 명세서를 준다**(11/11). 커밋 · 푸시와 코드를 올리는 axhub 명령은 사용자가 직접.
+- 진행 방식: Step 1→2→3 은 블록으로 받아 대조, **Step 4 에서 Claude 가 정답(메인 · 테스트)을 파일에 반영하고 Git 명세서를 준다**(11/11). 확인 명령은 Step 2 · 3 에 넣지 않고 Step 4 에서 Git 명세서 위에 한 번에(11/12). 커밋 · 푸시와 코드를 올리는 axhub 명령은 사용자가 직접.
 - 원본 로더: pandas 대신 표준 `csv` + Pydantic(행마다 출처 · 오류 위치 · 빈 값/열 개수 검사, 이미지 크기). `period_ym` 은 문자열, `NONE` 은 None, 틀린 행은 건너뛰지 않고 멈춤. 미수채권은 146행 전부 읽고 대리점 필터는 쓰는 쪽에서.
 - 04 DB 범위: 원본 5개 표만(AGENCY · IDENTITY_ATTR · DEPOSIT · AR_ITEM · REBATE_CLAIM), 나머지 표는 처음 쓰는 브랜치에서. DB 는 켤 때마다 새로 만들어 마이그레이션 불필요(11/12).
 - AR_ITEM 은 미수채권 146행 전부 저장. `customer_id` 추가, 고객 채권은 `agency_id` 가 비어 있음(11/12).
@@ -45,6 +45,8 @@ Last updated: 2026-11-12
 - 05 그룹: 2곳 이상 묶인 것만 저장(단독 47곳은 그룹 없음 → 06 은 자기 금액). 라벨 G1… 은 최소 agency_id 순. 버전 1 은 시더 끝에서 계산 → 초기화 행 수에 표 4개 추가(11/12).
 - 05 범위: 엔진 + 표 4개만. API 는 14(건 상세 화면)에서, `REBATE_CLAIM` 그룹 · 결재권자 컬럼은 06, `trigger_change_id` 는 20. 계산(순수 함수)과 저장을 나눠 20 정정 때 재사용(11/12).
 - 05 구현: 쌍은 `itertools.combinations` 로 전부 비교(1,225쌍, 규모가 커지면 값 → 대리점 역색인), 전이 묶기는 유니온-파인드. `save_group_version` 은 commit 하지 않음(20 에서 정정과 재계산을 한 트랜잭션으로). 시더 행 수는 `Base.metadata.sorted_tables` 로 DB 에서 센다(11/12).
+- 06 한도 판정(B): `REBATE_CLAIM` 에 `min_authority` · `group_id` · `group_sum_krw`(비면 판정 전). 시더는 안 채움 — 대상월 하나를 판정하는 함수가 채우고, 6월분은 08 접수 때. 1~5월을 시작 때 채우면 "판정 당시 그룹" 의미가 깨져서(A 기각). 구성 건은 같은 group_id · 대상월로 조회(11/12).
+- 06 규칙: 월 = 대상월 `period_ym`(6월분은 지급일 없음, 지급된 196건은 모두 다음 달 지급이라 결과 같음). 반려 건은 합산 제외(규정 기준이 "지급액"). 2,000,000원 이하 전결 · 초과 영업임원. 지금 버전 그룹 단위, 단독은 자기 금액. 상태는 안 바꿈(07 · 08). 결재권자 역할 enum 은 06 에서(04 docstring 의 "07" 정정). AI 가드 · API 는 범위 밖(17 · 08 · 13)(11/12).
 - 파이썬 의존성은 leo-dev 설치 버전으로 고정(fastapi 0.141.1, uvicorn 0.52.1) — 로컬과 Docker 동일. 테스트 도구는 `requirements-dev.txt` 로 분리.
 - GitHub 이슈는 쓰지 않고 로드맵 번호 · 브랜치 이름으로 관리(1인 · 4일 일정). 저장소 퍼블릭 공개는 주최 측 허용(11/11).
 - 루트 `.gitignore`(기록 키 3줄)는 대회 규칙상 수정 금지 → 앱용 ignore 는 폴더별 파일, axhub 로컬 상태 `.axhub/` 는 `.git/info/exclude`.
