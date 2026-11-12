@@ -14,7 +14,7 @@ from app.models.enums import ClaimStatus, IdentityAttrType, Provenance
 
 @pytest.fixture
 def db_engine(tmp_path):
-    """원본 5개 표를 만든 임시 파일 DB."""
+    """ERD 의 모든 표를 만든 임시 파일 DB."""
     eng = make_engine(f"sqlite:///{tmp_path / 'test.db'}")
     Base.metadata.create_all(eng)
     yield eng
@@ -52,14 +52,18 @@ def make_claim(agency_id: str = "D-011") -> RebateClaim:
     )
 
 
-def test_create_all_makes_five_source_tables(db_engine):
-    """create_all 하면 원본 5개 표가 ERD 이름 그대로 생긴다."""
+def test_create_all_makes_erd_tables(db_engine):
+    """create_all 하면 원본 5개 표와 관련자 표 4개가 ERD 이름 그대로 생긴다."""
     assert sorted(inspect(db_engine).get_table_names()) == [
         "agency",
         "ar_item",
         "deposit",
+        "group_member",
+        "group_version",
         "identity_attr",
         "rebate_claim",
+        "related_group",
+        "relation_edge",
     ]
 
 

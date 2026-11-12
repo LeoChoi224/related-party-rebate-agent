@@ -2,13 +2,14 @@
 
 원본 CSV 4개로 업무 DB 를 지우고 다시 채운다. 앱 시작과 시연 초기화가 같은 함수를 쓴다.
 같은 원본이면 항상 같은 결과가 나와야 한다(재현성).
+식별속성으로 관련자를 판정해 그룹 버전 1 도 함께 저장한다.
 확장 데이터 [가정](backend/data/ext)은 그 데이터를 처음 쓰는 브랜치에서 더한다.
 """
 
 import logging
 from pathlib import Path
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import RAW_DATA_DIR
@@ -29,6 +30,7 @@ from app.seed.source_rows import (
     RebatePaymentRow,
     SourceRow,
 )
+from app.services.related_party import find_related_parties, save_group_version
 
 logger = logging.getLogger(__name__)
 
@@ -48,24 +50,32 @@ def reset_database(engine: Engine, raw_dir: Path = RAW_DATA_DIR) -> dict[str, in
     deposit_rows = read_source_csv(DEPOSIT_CSV, DepositRow, raw_dir)
     rebate_rows = read_source_csv(REBATE_PAYMENT_CSV, RebatePaymentRow, raw_dir)
 
+    identity_attrs = _identity_attributes(agency_rows, deposit_rows)
     # 외래키 순서(부모 표 먼저). relationship 이 없어 SQLAlchemy 가 순서를 정해 주지 않는다.
     tables = [
-        (Agency, [Agency(**_columns(row)) for row in agency_rows]),
-        (ARItem, [ARItem(**_columns(row)) for row in ar_rows]),
-        (Deposit, [Deposit(**_columns(row)) for row in deposit_rows]),
-        (RebateClaim, [_to_claim(row) for row in rebate_rows]),
-        (IdentityAttribute, _identity_attributes(agency_rows, deposit_rows)),
+        [Agency(**_columns(row)) for row in agency_rows],
+        [ARItem(**_columns(row)) for row in ar_rows],
+        [Deposit(**_columns(row)) for row in deposit_rows],
+        [_to_claim(row) for row in rebate_rows],
+        identity_attrs,
     ]
+    # 관련자 판정도 DB 를 지우기 전에 끝낸다. 아직 DB 에 없는 객체라도 값은 다 들어 있다.
+    grouping = find_related_parties(identity_attrs)
 
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with Session(engine) as session, session.begin():
-        for _, objects in tables:
+        for objects in tables:
             session.add_all(objects)
             # 다음 표가 가리킬 부모 행을 DB 에 먼저 넣어 외래키 검사를 통과시킨다.
             session.flush()
+        save_group_version(session, grouping)
+        # 그룹 표는 저장 함수 안에서 생기므로, 목록 길이가 아니라 DB 에 들어간 행을 센다.
+        counts = {
+            table.name: session.scalar(select(func.count()).select_from(table))
+            for table in Base.metadata.sorted_tables
+        }
 
-    counts = {model.__tablename__: len(objects) for model, objects in tables}
     logger.info("업무 DB 를 원본으로 초기화했습니다: %s", counts)
     return counts
 

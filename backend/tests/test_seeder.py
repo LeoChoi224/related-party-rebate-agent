@@ -26,6 +26,10 @@ EXPECTED_COUNTS = {
     "deposit": 32,
     "rebate_claim": 240,
     "identity_attr": 182,
+    "group_version": 1,
+    "related_group": 1,
+    "group_member": 3,
+    "relation_edge": 4,
 }
 G1 = ("D-011", "D-024", "D-037")
 

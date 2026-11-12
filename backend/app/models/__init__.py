@@ -8,12 +8,22 @@ from app.models.agency import Agency, Deposit, IdentityAttribute
 from app.models.base import Base
 from app.models.rebate import RebateClaim
 from app.models.receivable import ARItem
+from app.models.related_party import (
+    GroupMember,
+    GroupVersion,
+    RelatedGroup,
+    RelationEdge,
+)
 
 __all__ = [
     "ARItem",
     "Agency",
     "Base",
     "Deposit",
+    "GroupMember",
+    "GroupVersion",
     "IdentityAttribute",
     "RebateClaim",
+    "RelatedGroup",
+    "RelationEdge",
 ]
