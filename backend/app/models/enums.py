@@ -2,7 +2,6 @@
 
 DB 에는 한글 값 그대로 문자열로 저장한다. StrEnum 은 문자열과 같게 비교되므로
 String 컬럼에 그대로 넣고 꺼내도 된다.
-장려금 건의 나머지 상태는 07(상태 머신)에서 더한다.
 """
 
 from enum import StrEnum
@@ -27,11 +26,25 @@ class IdentityAttrType(StrEnum):
 
 
 class ClaimStatus(StrEnum):
-    """장려금 건 업무 상태. 지금은 원본에서 옮긴 첫 값 3개만 둔다."""
+    """장려금 건 업무 상태. 업무 흐름 순서로 적는다.
+
+    바꾸는 길은 services/claim_state.py 하나다. 허용되는 전이는 docs/architecture.md 5장.
+    """
 
     NOT_RECEIVED = "미접수"
-    PAID = "지급완료"
+    RECEIVED = "접수"
+    RELATION_CHECKED = "관계확인"
+    AWAITING_SUPPORT = "전결대기"
+    AWAITING_EXECUTIVE = "상신대기"
+    AWAITING_EXPLANATION = "소명대기"
+    ON_HOLD = "지급보류"
+    APPROVED = "승인"
     REJECTED = "반려"
+    OFFSET_REVIEW = "상계검토"
+    PAYMENT_ORDERED = "지급지시"
+    PAID = "지급완료"
+    OFFSET_DONE = "상계완료"
+    NEEDS_REVIEW = "재검토필요"
 
 
 class ApproverRole(StrEnum):

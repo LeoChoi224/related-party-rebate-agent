@@ -53,11 +53,12 @@ def make_claim(agency_id: str = "D-011") -> RebateClaim:
 
 
 def test_create_all_makes_erd_tables(db_engine):
-    """create_all 하면 원본 5개 표와 관련자 표 4개가 ERD 이름 그대로 생긴다."""
+    """create_all 하면 원본 5개 표, 관련자 표 4개, 이력 표가 ERD 이름 그대로 생긴다."""
     assert sorted(inspect(db_engine).get_table_names()) == [
         "agency",
         "ar_item",
         "deposit",
+        "event_log",
         "group_member",
         "group_version",
         "identity_attr",
@@ -77,6 +78,9 @@ def test_create_all_makes_erd_tables(db_engine):
         ("rebate_claim", "min_authority", True),
         ("rebate_claim", "group_id", True),
         ("rebate_claim", "group_sum_krw", True),
+        ("event_log", "payload", True),
+        ("event_log", "from_status", False),
+        ("event_log", "reason", False),
         ("identity_attr", "valid_to", True),
         ("ar_item", "outstanding_krw", False),
         ("rebate_claim", "status", False),
@@ -189,7 +193,22 @@ def test_deposit_for_unknown_receivable_is_rejected(db_engine):
 
 def test_enum_values_match_source_labels():
     """코드 값은 원본·화면에 쓰는 한글 표기와 같다."""
-    assert {s.value for s in ClaimStatus} == {"미접수", "지급완료", "반려"}
+    assert [s.value for s in ClaimStatus] == [
+        "미접수",
+        "접수",
+        "관계확인",
+        "전결대기",
+        "상신대기",
+        "소명대기",
+        "지급보류",
+        "승인",
+        "반려",
+        "상계검토",
+        "지급지시",
+        "지급완료",
+        "상계완료",
+        "재검토필요",
+    ]
     assert {p.value for p in Provenance} == {"원본", "주장", "가정", "모의"}
     # 낮은 단계부터 적은 순서도 계약이다. 가드(17)가 이 순서로 높낮이를 본다.
     assert [r.value for r in ApproverRole] == ["영업지원팀", "영업임원"]
