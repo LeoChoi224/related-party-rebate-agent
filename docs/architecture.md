@@ -206,6 +206,8 @@ flowchart TD
 - 한도 판정: 대상월(`period_ym`) 기준, 지금 버전 그룹 단위(그룹이 없으면 대리점 혼자)로 반려 건을 뺀 장려금을 합산한다. 2,000,000원 이하면 영업지원팀, 넘으면 영업임원. 단독 대리점도 `group_sum_krw` 에 자기 금액을 넣고 `group_id` 는 비운다. 구성 건은 같은 `group_id` · 같은 대상월로 조회하며 따로 저장하지 않는다.
 - **09 `feat/approval-request` 는 `APPROVAL_REQUEST` · `APPROVAL_ITEM` 을 더한다.** 08 접수 때 상신대기로 간 건을 판정 단위마다 묶어 요청 1건을 같은 트랜잭션에서 만든다(원본 기준 G1 요청 1건 · 포함 3건). `rec_id` 는 `AI_RECOMMENDATION` 과 함께 17 에서 더한다. 그룹 근거는 복사하지 않고 `group_id` 로 `RELATION_EDGE` 를 찾는다.
 - 결재 권한: 결정하는 역할이 요구 역할(요청의 `approver_role`, 전결 건은 `min_authority`) **이상** 이어야 한다(`ApproverRole` 순서로 비교, 결재권자가 아닌 역할은 항상 부족 → 403). 반려는 사유 필수(422). 이미 결정된 요청 · 건은 상태 머신이 막는다(409). 상신대기 건은 전결 결정 길로 결정할 수 없다(요청 기록 없이 승인되는 것을 막음). 결정자 이름 · 역할은 시연용으로 요청 본문에 담는다(실제 시스템이면 로그인 토큰에서 꺼낸다).
+- **10 `feat/task-dispatcher` 는 `TASK` 를 더한다.** 작업은 상태 머신의 전이 함수 안에서 규칙표로 자동 생성된다(상태를 바꾸는 길이 하나라 빠지는 작업이 없다). 규칙표 키는 (이전 상태, 이후 상태)이고 이전 상태 조건이 없는 규칙은 "아무거나"다: 승인 → 재무 지급 실행, 소명대기 → 영업지원팀 소명 요청, 소명대기 → 지급보류 → 영업지원팀 추가 소명 요청, 지급지시 → 지급보류 → 재무 지급 계좌 확인, 상계검토 → 재무 상계 검토, 재검토필요 → 영업지원팀 재판정. 결재 대기(전결대기 · 상신대기)는 작업이 아니라 처리함에서 다룬다.
+- 건이 어떤 상태를 떠나면 그 상태(`trigger_status`)가 만든 열린 작업은 자동 완료된다(예: 승인 → 지급지시 이면 지급 실행 작업이 닫힘). 사람은 작업 API 로 열림 → 진행 → 완료를 표시하고, 완료는 다시 열 수 없다. 작업 상태 변경은 이력(`EVENT_LOG`)에 남기지 않는다. 상태 전이가 아닌 작업(접수 때 정황 소명 요청 · 24 의 감사 사후 검토)은 `trigger_status` · `created_by_event` 가 비어 있다. 부서 이름은 역할 이름과 같다.
 
 ```mermaid
 erDiagram
@@ -401,12 +403,16 @@ erDiagram
   }
   TASK {
     int task_id PK
-    string dept "재무 영업지원 감사"
+    string dept "재무 영업지원팀 내부감사"
     string task_type
     string ref_type
     string ref_id
     string status "열림 진행 완료"
-    int created_by_event FK
+    string trigger_status "이 작업을 만든 상태 · 전이 아니면 비어 있음"
+    string detail "생긴 이유"
+    int created_by_event FK "전이 아니면 비어 있음"
+    datetime created_at
+    datetime closed_at
   }
   EVENT_LOG {
     int event_id PK
