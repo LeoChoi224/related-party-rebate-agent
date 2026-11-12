@@ -2,7 +2,7 @@
 
 RebateClaim: 월 장려금 1건(sales_rebate_payment_cv) [원본].
 업무 상태(status)의 유일한 기준이다. 원본 값은 original_* 컬럼에 그대로 남긴다.
-최소 결재권자와 판정 당시 그룹·합산액 컬럼은 관련자 그룹 표가 생기는 05 에서 더한다.
+최소 결재권자와 판정 당시 그룹·합산액 컬럼은 한도 판정을 하는 06 에서 더한다.
 """
 
 from datetime import date
