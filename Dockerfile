@@ -14,6 +14,8 @@ WORKDIR /app
 COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/ backend/
+# 앱이 켜질 때 이 원본으로 업무 DB 를 다시 만든다. 쓰는 4개 파일이 든 01_corevia 만 넣는다.
+COPY 01_참가자_배포용/04_원본데이터/01_corevia 01_참가자_배포용/04_원본데이터/01_corevia
 COPY --from=frontend /app/frontend/dist frontend/dist
 
 WORKDIR /app/backend

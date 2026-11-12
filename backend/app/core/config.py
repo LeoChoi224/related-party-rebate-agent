@@ -11,3 +11,7 @@ PROJECT_ROOT = BACKEND_DIR.parent
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 # 대회 원본 데이터. 읽기만 한다.
 RAW_DATA_DIR = PROJECT_ROOT / "01_참가자_배포용" / "04_원본데이터"
+# ===================== 추가: 업무 DB 파일 경로 =====================
+# 업무 DB. 앱을 켤 때마다 원본으로 다시 만든다.
+DB_PATH = BACKEND_DIR / "data" / "app.db"
+# ==================================================================

@@ -194,6 +194,10 @@ flowchart TD
 - 관련자 그룹은 **버전 단위**로 다시 계산한다. 정정이 들어오면 새 `GROUP_VERSION`이 생기고, 이전 판단의 근거는 그대로 남는다.
 - `AI_RECOMMENDATION`은 AI 추천과 사람의 최종 결정을 한 행에 함께 남긴다. 추천 일치율을 여기서 계산한다.
 - LangGraph 체크포인트 테이블은 라이브러리가 관리하므로 ERD에 넣지 않았다.
+- **04 `feat/db-schema` 는 원본 5개 표만 만든다**(`AGENCY` · `IDENTITY_ATTR` · `DEPOSIT` · `AR_ITEM` · `REBATE_CLAIM`). 나머지 표는 처음 쓰는 브랜치에서 추가한다. DB 는 켤 때마다 원본으로 새로 만들므로 마이그레이션 도구는 쓰지 않는다.
+- `AR_ITEM` 은 원본 146행(대리점 채권 74 + 고객 채권 72)을 전부 저장한다. 고객 채권은 `customer_id` 만 있고 `agency_id` 는 비어 있다.
+- `IDENTITY_ATTR` 초기 행 = 대리점마다 대표자 · 주소 · 등록계좌 3행(`valid_from` = `registered_date`) + 입금마다 실입금계좌 1행(`valid_from` = `deposit_date`) = 150 + 32 = 182행.
+- `REBATE_CLAIM.status` 첫 값은 원본 상태에서 옮긴다: 승인 → 지급완료, 반려 → 반려, 미지급 → 미접수 **[가정]**. 원본 값은 `original_status` · `original_approver` · `original_payment_date` 에 그대로 남긴다.
 
 ```mermaid
 erDiagram
@@ -216,8 +220,8 @@ erDiagram
     string value
     string provenance "원본 가정 모의"
     string source_ref "파일과 행"
-    datetime valid_from
-    datetime valid_to "정정되면 닫힘"
+    date valid_from
+    date valid_to "정정되면 닫힘"
   }
   DEPOSIT {
     string deposit_id PK "DP-nnnnn"
@@ -226,16 +230,19 @@ erDiagram
     int amount_krw
     string bank_account_no "실입금계좌"
     string matched_ar_id FK
+    string source_file
     int source_row
   }
   AR_ITEM {
     string ar_id PK "AR-Dnnnnn"
-    string agency_id FK
+    string agency_id FK "고객 채권이면 비어 있음"
+    string customer_id "고객 채권만"
     date invoice_date
     date due_date
     int amount_krw
     int outstanding_krw "원본 잔액 · 수정 안 함"
     int aging_days
+    string source_file
     int source_row
   }
   AR_ADJUSTMENT {
@@ -292,6 +299,9 @@ erDiagram
     int group_id FK "판정 당시 그룹"
     int group_sum_krw
     string original_status "원본 승인 미지급 반려"
+    string original_approver "원본 · NONE 이면 비어 있음"
+    date original_payment_date "원본 · NONE 이면 비어 있음"
+    string source_file
     int source_row
   }
   APPROVAL_REQUEST {
@@ -404,7 +414,7 @@ erDiagram
 
   AGENCY ||--o{ IDENTITY_ATTR : "식별정보"
   AGENCY ||--o{ DEPOSIT : "입금"
-  AGENCY ||--o{ AR_ITEM : "미수채권"
+  AGENCY |o--o{ AR_ITEM : "미수채권"
   AGENCY ||--o{ REBATE_CLAIM : "장려금"
   AGENCY ||--o{ MASTER_CHANGE : "정정 신고"
   AGENCY ||--o{ GROUP_MEMBER : "소속"

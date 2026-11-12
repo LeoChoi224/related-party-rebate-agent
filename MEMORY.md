@@ -1,6 +1,6 @@
 # MEMORY — W07 판매장려금 통제 데스크
 
-Last updated: 2026-11-11 21:00
+Last updated: 2026-11-12
 
 ## 지금 상태
 
@@ -9,14 +9,17 @@ Last updated: 2026-11-11 21:00
 - 원격: `origin` = Axhub 저장소(배포용, `main` push 시 자동 배포), `github` = GitHub `LeoChoi224/related-party-rebate-agent`(퍼블릭, PR 용). 라벨: GitHub 기본 10개 + `chore`.
 - axhub CLI v0.63.0(`~/.axhub/bin/axhub`, PATH 미등록) · 플러그인 axhub@axhub 1.43.0 · 로그인(leochoi224@gmail.com). lounge 테넌트 `c7a0a6fe-86c6-45f4-adc2-3ab7bd19ea36`.
 - AXHub 앱 `related-party-rebate-agent`(Docker, 앱 ID `6a0fd4bd-b4cf-45eb-865c-dff1dfd8047a`), 주소 https://related-party-rebate-agent-h6nw.axhub.app . 배포본 = `750dfd5`(01 최소 앱 + 02 배포 설정). **절전 중**(11/11 20:20 KST부터).
-- GitHub: PR #1(뼈대) · PR #2(01·02 + 메모리) 머지됨. `github/main` = `4e0cb6e`.
-- 로컬: `main` = `750dfd5` 로 `github/main` 보다 2커밋 뒤. 작업 폴더에 커밋 전 변경 — 메모리 3개(`9ea829f` 이후 추가 수정: Step 4 규칙 등) + 03 코드 5개.
-- 로드맵 완료: 00 · 01 · 02. 03 `feat/data-loader` 는 Step 4 반영 · 검증 완료(테스트 27개), 커밋 전.
+- GitHub: PR #1(뼈대) · PR #2(01·02 + 메모리) · PR #3(03 로더 + 메모리) 머지됨. `github/main` = `30973de`.
+- 로컬: `main` · `feat/db-schema` 둘 다 `30973de`(11/12 fast-forward). `feat/db-schema` 에 04 커밋은 아직 없음.
+- 로드맵 완료: 00 · 01 · 02 · 03. 04 `feat/db-schema` 는 Step 1~4 끝(DB 연결 → 모델 5개 → 시더 → lifespan · `POST /api/demo/reset`). 11/12 Step 4 반영 · 검증 완료(ruff 통과, pytest 60개), **커밋 전**. 로컬 Docker 빌드는 미확인.
+- 04 설정 변경(승인 받고 Claude 가 작성): `backend/requirements.txt` 에 `sqlalchemy==2.0.51`, `Dockerfile` 의 `COPY backend/` 아래에 원본 `01_corevia` 폴더 COPY.
+- 04 확인 숫자: agency 50 · identity_attr 182 · deposit 32 · ar_item 146 · rebate_claim 240, G1 6월 합산 3,888,097, 상태 지급완료 196 · 미접수 40 · 반려 4.
 
 ## 다음에 할 일
 
-- 03 커밋 · PR (사용자). 메모리 파일이 `9ea829f` 보다 새 버전이라 `main` 에서 바로 pull 하면 멈춘다 → `feat/data-loader` 브랜치에서 03 코드 · 메모리를 따로 커밋 → `git merge -X ours github/main` → `git push -u github feat/data-loader` → PR(Create a merge commit) → `git switch main` · `git pull github main`. 임시 복제본에서 충돌 없이 끝나는 것 확인(11/11).
-- 04 `feat/db-schema` Step 1 — 원본 폴더를 Docker 이미지에 넣는 Dockerfile 수정 포함(설정 파일, 승인 필요).
+- 04 커밋 · 푸시 · PR (사용자, Git 명세서 11/12 전달: 코드 커밋 + 메모리 · 문서 커밋 2개 → `git push -u github feat/db-schema`). 머지 뒤 `main` 에서 `git pull github main`.
+- 배포 전 `axhub deploy check` 로 원본 COPY 가 들어간 Dockerfile 확인.
+- 로드맵 05(판정 엔진, min_authority · group 컬럼 추가) Step 1.
 - 제출 전 앱 `wake` 후 심사 기간 내내 켜 두기.
 
 ## 결정과 근거
@@ -30,6 +33,14 @@ Last updated: 2026-11-11 21:00
 - 필수 확장 = 지급 전 미수채권 대조 · 상계 [가정]. 다른 부서 영향 = 재무(채권 회수) · 영업(대리점 관계) · 감사(사후 검토).
 - 진행 방식: Step 1→2→3 은 블록으로 받아 대조, **Step 4 에서 Claude 가 정답(메인 · 테스트)을 파일에 반영하고 Git 명세서를 준다**(11/11). 커밋 · 푸시와 코드를 올리는 axhub 명령은 사용자가 직접.
 - 원본 로더: pandas 대신 표준 `csv` + Pydantic(행마다 출처 · 오류 위치 · 빈 값/열 개수 검사, 이미지 크기). `period_ym` 은 문자열, `NONE` 은 None, 틀린 행은 건너뛰지 않고 멈춤. 미수채권은 146행 전부 읽고 대리점 필터는 쓰는 쪽에서.
+- 04 DB 범위: 원본 5개 표만(AGENCY · IDENTITY_ATTR · DEPOSIT · AR_ITEM · REBATE_CLAIM), 나머지 표는 처음 쓰는 브랜치에서. DB 는 켤 때마다 새로 만들어 마이그레이션 불필요(11/12).
+- AR_ITEM 은 미수채권 146행 전부 저장. `customer_id` 추가, 고객 채권은 `agency_id` 가 비어 있음(11/12).
+- REBATE_CLAIM `status` 첫 값: 승인→지급완료, 반려→반려, 미지급→미접수 [가정]. 원본은 `original_status` · `original_approver` · `original_payment_date` 에 보존(11/12).
+- IDENTITY_ATTR 초기 182행 = 대리점마다 대표자 · 주소 · 등록계좌 3행(valid_from = registered_date) + 입금마다 실입금계좌 1행(valid_from = deposit_date). valid_from/valid_to 는 date(11/12).
+- 상태 · 종류 컬럼은 `StrEnum` + `String` 으로 한글 값을 저장한다. SQLAlchemy `Enum` 은 멤버 이름(`PAID`)을 저장해서 쓰지 않음(11/12).
+- 시더는 상태 변환 · 원본 읽기를 `drop_all` 앞에서 끝낸다 → 원본이 틀리면 기존 DB 가 그대로 남는다. 앱은 시작 실패로 드러난다(11/12).
+- 로그: `app` 로거만 INFO 로 연다. 루트를 INFO 로 올리면 httpx 요청 로그가 섞인다(SQLAlchemy 는 스스로 WARNING 고정이라 이유가 아님)(11/12).
+- `database.py` 는 엔진만. 세션 팩토리 · 요청별 세션 의존성은 처음 조회 API 를 만드는 브랜치에서(뼈대와 다름, 11/12).
 - 파이썬 의존성은 leo-dev 설치 버전으로 고정(fastapi 0.141.1, uvicorn 0.52.1) — 로컬과 Docker 동일. 테스트 도구는 `requirements-dev.txt` 로 분리.
 - GitHub 이슈는 쓰지 않고 로드맵 번호 · 브랜치 이름으로 관리(1인 · 4일 일정). 저장소 퍼블릭 공개는 주최 측 허용(11/11).
 - 루트 `.gitignore`(기록 키 3줄)는 대회 규칙상 수정 금지 → 앱용 ignore 는 폴더별 파일, axhub 로컬 상태 `.axhub/` 는 `.git/info/exclude`.
