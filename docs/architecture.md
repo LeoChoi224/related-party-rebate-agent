@@ -202,6 +202,8 @@ flowchart TD
 - 판정: 대표자 · 주소 · 계좌 중 2개 이상 같으면 관련자, 1개면 정황. **계좌는 속성 1개**로, 대리점의 등록계좌와 실입금계좌를 한 묶음으로 보고 묶음끼리 하나라도 겹치면 일치다. 지금 유효한 속성(`valid_to` 가 비어 있음)만, 문자열이 정확히 같을 때만 일치로 본다.
 - `RELATED_GROUP` 은 **2곳 이상 묶인 그룹만** 저장한다(원본 기준 G1 하나). 그룹이 없는 대리점은 자기 금액만으로 한도를 본다. 라벨은 그룹 안 가장 작은 `agency_id` 순으로 G1, G2 … 를 붙인다.
 - `RELATION_EDGE` 는 1개 이상 일치한 쌍만 저장한다(원본 기준 4쌍: 관련자 3 · 정황 1). `agency_a` 가 작은 ID 다. `matched_attrs` 는 일치한 속성마다 값과 양쪽 근거 행(`IDENTITY_ATTR.source_ref`)을 담는다.
+- **06 `feat/approval-authority` 는 `REBATE_CLAIM` 에 `min_authority` · `group_id` · `group_sum_krw` 를 더한다.** 셋 다 비어 있을 수 있고, 비어 있으면 아직 판정 전이다. 시더는 채우지 않는다. 대상월 하나를 판정하는 함수가 채우며, 6월분은 08 접수 때 채운다(1~5월 위반은 감사 24 에서 같은 함수로 계산).
+- 한도 판정: 대상월(`period_ym`) 기준, 지금 버전 그룹 단위(그룹이 없으면 대리점 혼자)로 반려 건을 뺀 장려금을 합산한다. 2,000,000원 이하면 영업지원팀, 넘으면 영업임원. 단독 대리점도 `group_sum_krw` 에 자기 금액을 넣고 `group_id` 는 비운다. 구성 건은 같은 `group_id` · 같은 대상월로 조회하며 따로 저장하지 않는다.
 
 ```mermaid
 erDiagram
@@ -299,9 +301,9 @@ erDiagram
     int sales_performance_krw
     int rebate_amount_krw
     string status "업무 상태 · 유일한 기준"
-    string min_authority "코드 계산 최소 결재권자"
-    int group_id FK "판정 당시 그룹"
-    int group_sum_krw
+    string min_authority "코드 계산 최소 결재권자 · 비면 판정 전"
+    int group_id FK "판정 당시 그룹 · 단독이면 비어 있음"
+    int group_sum_krw "판정 단위 월 합산"
     string original_status "원본 승인 미지급 반려"
     string original_approver "원본 · NONE 이면 비어 있음"
     date original_payment_date "원본 · NONE 이면 비어 있음"
