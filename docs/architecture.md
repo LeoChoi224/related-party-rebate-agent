@@ -204,6 +204,8 @@ flowchart TD
 - `RELATION_EDGE` 는 1개 이상 일치한 쌍만 저장한다(원본 기준 4쌍: 관련자 3 · 정황 1). `agency_a` 가 작은 ID 다. `matched_attrs` 는 일치한 속성마다 값과 양쪽 근거 행(`IDENTITY_ATTR.source_ref`)을 담는다.
 - **06 `feat/approval-authority` 는 `REBATE_CLAIM` 에 `min_authority` · `group_id` · `group_sum_krw` 를 더한다.** 셋 다 비어 있을 수 있고, 비어 있으면 아직 판정 전이다. 시더는 채우지 않는다. 대상월 하나를 판정하는 함수가 채우며, 6월분은 08 접수 때 채운다(1~5월 위반은 감사 24 에서 같은 함수로 계산).
 - 한도 판정: 대상월(`period_ym`) 기준, 지금 버전 그룹 단위(그룹이 없으면 대리점 혼자)로 반려 건을 뺀 장려금을 합산한다. 2,000,000원 이하면 영업지원팀, 넘으면 영업임원. 단독 대리점도 `group_sum_krw` 에 자기 금액을 넣고 `group_id` 는 비운다. 구성 건은 같은 `group_id` · 같은 대상월로 조회하며 따로 저장하지 않는다.
+- **09 `feat/approval-request` 는 `APPROVAL_REQUEST` · `APPROVAL_ITEM` 을 더한다.** 08 접수 때 상신대기로 간 건을 판정 단위마다 묶어 요청 1건을 같은 트랜잭션에서 만든다(원본 기준 G1 요청 1건 · 포함 3건). `rec_id` 는 `AI_RECOMMENDATION` 과 함께 17 에서 더한다. 그룹 근거는 복사하지 않고 `group_id` 로 `RELATION_EDGE` 를 찾는다.
+- 결재 권한: 결정하는 역할이 요구 역할(요청의 `approver_role`, 전결 건은 `min_authority`) **이상** 이어야 한다(`ApproverRole` 순서로 비교, 결재권자가 아닌 역할은 항상 부족 → 403). 반려는 사유 필수(422). 이미 결정된 요청 · 건은 상태 머신이 막는다(409). 상신대기 건은 전결 결정 길로 결정할 수 없다(요청 기록 없이 승인되는 것을 막음). 결정자 이름 · 역할은 시연용으로 요청 본문에 담는다(실제 시스템이면 로그인 토큰에서 꺼낸다).
 
 ```mermaid
 erDiagram
@@ -312,19 +314,20 @@ erDiagram
   }
   APPROVAL_REQUEST {
     int request_id PK
-    int group_id FK
+    int group_id FK "단독 대리점이면 비어 있음"
     string period_ym
     int group_sum_krw
     string approver_role "영업임원"
-    int rec_id FK "AI 추천"
-    string decision "승인 반려"
+    int rec_id FK "AI 추천 · 17 에서"
+    datetime created_at
+    string decision "승인 반려 · 결정 전엔 비어 있음"
     string reason
     string decided_by
     datetime decided_at
   }
   APPROVAL_ITEM {
-    int request_id FK
-    string rebate_id FK
+    int request_id PK, FK
+    string rebate_id PK, FK
   }
   EXPLANATION_REQUEST {
     int exp_id PK
