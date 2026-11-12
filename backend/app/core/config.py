@@ -9,3 +9,5 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
+# 대회 원본 데이터. 읽기만 한다.
+RAW_DATA_DIR = PROJECT_ROOT / "01_참가자_배포용" / "04_원본데이터"
