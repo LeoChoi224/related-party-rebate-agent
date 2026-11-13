@@ -6,6 +6,7 @@ import type { AiReview } from './aiReview.ts'
 import type { ApprovalSummary } from './approval.ts'
 import type { ApproverRole, ClaimStatus } from './enums.ts'
 import type { EventLogItem } from './eventLog.ts'
+import type { Explanation } from './explanation.ts'
 import type { PaymentItem } from './payment.ts'
 import type { RelationEdge } from './relatedParty.ts'
 
@@ -71,4 +72,6 @@ export type ClaimDetail = {
   events: EventLogItem[]
   /** 검토 단위(상신 건이면 승인 요청)의 가장 최근 AI 추천. 검토 전이면 null */
   ai_review: AiReview | null
+  /** 이 건의 소명 요청들(요청 ID 순). 요청마다 회신 · AI 주장 대조 · 사람 확인이 붙는다. */
+  explanations: Explanation[]
 }
