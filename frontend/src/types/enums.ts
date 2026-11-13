@@ -76,3 +76,11 @@ export const RelationJudgement = {
   CIRCUMSTANTIAL: '정황',
 } as const
 export type RelationJudgement = (typeof RelationJudgement)[keyof typeof RelationJudgement]
+
+/** AI 추천. 사람은 Decision(승인 · 반려)만 고르고, 소명 먼저는 AI 만 낸다. */
+export const Recommendation = {
+  APPROVE: '승인',
+  REJECT: '반려',
+  EXPLAIN_FIRST: '소명 먼저',
+} as const
+export type Recommendation = (typeof Recommendation)[keyof typeof Recommendation]

@@ -2,6 +2,7 @@
  * 장려금 건 응답 타입. 백엔드 schemas/rebate.py 와 맞춘다.
  * 접수 결과, 처리함 목록 한 줄, 건 상세.
  */
+import type { AiReview } from './aiReview.ts'
 import type { ApprovalSummary } from './approval.ts'
 import type { ApproverRole, ClaimStatus } from './enums.ts'
 import type { EventLogItem } from './eventLog.ts'
@@ -68,4 +69,6 @@ export type ClaimDetail = {
   approval: ApprovalSummary | null
   payments: PaymentItem[]
   events: EventLogItem[]
+  /** 검토 단위(상신 건이면 승인 요청)의 가장 최근 AI 추천. 검토 전이면 null */
+  ai_review: AiReview | null
 }

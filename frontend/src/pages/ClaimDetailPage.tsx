@@ -1,14 +1,15 @@
 /**
  * 장려금 건 상세 페이지.
  * 다음 행동, 원본 기록, 결재 경로(코드 계산)와 관련자 근거, 승인 요청, 지급, 이력을 보여 준다.
- * 서버가 준 값만 보여 주고 판정을 다시 계산하지 않는다. AI 추천 패널은 17 에서 더한다.
+ * 서버가 준 값만 보여 주고 판정을 다시 계산하지 않는다. AI 추천은 결정 대기 건에서 버튼으로 검토한다.
  * 행동 버튼은 건 상태만 보고 고른다. 역할 권한은 서버가 403 · 409 로 판단한다(14 결정).
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { decideApproval } from '../api/approvals.ts'
 import { ApiError } from '../api/client.ts'
-import { decideClaim, getClaim, orderPayment } from '../api/claims.ts'
+import { decideClaim, getClaim, orderPayment, reviewClaim } from '../api/claims.ts'
+import AiPanel from '../components/AiPanel.tsx'
 import { sendBankReply } from '../api/payments.ts'
 import AuthorityNotice from '../components/AuthorityNotice.tsx'
 import DecisionForm from '../components/DecisionForm.tsx'
@@ -86,6 +87,27 @@ function ClaimDetailView({ rebateId }: { rebateId: string }) {
       {error !== null && <p className="error">{error}</p>}
 
       <NextAction detail={detail} busy={busy} error={actionError} run={run} />
+
+      <section className="detail-section">
+        <h3>AI 추천</h3>
+        {detail.ai_review !== null ? (
+          <AiPanel review={detail.ai_review} />
+        ) : detail.status === ClaimStatus.AWAITING_SUPPORT ||
+          detail.status === ClaimStatus.AWAITING_EXECUTIVE ? (
+          <div className="actions">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => run(() => reviewClaim(detail.rebate_id))}
+            >
+              AI 검토
+            </button>
+            <span className="muted">LLM 을 부르므로 몇 초 걸릴 수 있습니다.</span>
+          </div>
+        ) : (
+          <p className="muted">AI 검토 기록 없음</p>
+        )}
+      </section>
 
       <section className="detail-section">
         <h3>
