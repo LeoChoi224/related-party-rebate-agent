@@ -90,6 +90,7 @@ def test_create_all_makes_erd_tables(db_engine):
         "group_version",
         "identity_attr",
         "master_change",
+        "master_change_report",
         "offset_proposal",
         "payment_order",
         "rebate_claim",

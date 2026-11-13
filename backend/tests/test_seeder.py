@@ -43,6 +43,7 @@ EXPECTED_COUNTS = {
     "master_change": 0,
     "offset_proposal": 0,
     "ar_adjustment": 0,
+    "master_change_report": 0,
 }
 G1 = ("D-011", "D-024", "D-037")
 

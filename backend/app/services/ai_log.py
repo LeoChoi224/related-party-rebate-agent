@@ -1,8 +1,9 @@
-"""AI 추천 기록(25): 세 AI 의 출력과 사람 결정, 일치율을 한 목록으로 모은다. 읽기만 한다.
+"""AI 추천 기록(25): AI 출력과 사람 결정, 일치율을 한 목록으로 모은다. 읽기만 한다.
 
 - 장려금 검토(claim_review): ai_recommendation 행. 추천 vs 결정(승인 · 반려, "소명 먼저"는 반려 + 소명 요청).
 - 소명 검토(explanation_review): AI 검토가 돈 소명 회신. AI 판단 vs 영업지원팀 확인(증빙 충분 · 부족).
 - 상계 추천(22): AI 추천을 받은 상계 제안. 추천 상계액 vs 재무 결정(상계하지 않음 = 0원).
+- 정정 신고 해석(19): 신고 문장의 해석 vs 영업지원팀이 적용한 값(기각은 비교하지 않음).
 일치율의 분모는 AI 출력이 있고 사람이 결정한 것(compared)이다. 대체 모드는 비교할 것이 없어 빠진다.
 """
 
@@ -14,6 +15,8 @@ from app.models import (
     ApprovalItem,
     ExplanationReply,
     ExplanationRequest,
+    MasterChange,
+    MasterChangeReport,
     OffsetProposal,
 )
 from app.schemas.ai_recommendation import AiKindStats, AiLogOut, AiLogRow
@@ -22,7 +25,8 @@ from app.services.claim_detail import TARGET_REQUEST
 KIND_CLAIM = "장려금 검토"
 KIND_EXPLANATION = "소명 검토"
 KIND_OFFSET = "상계 추천"
-KINDS = (KIND_CLAIM, KIND_EXPLANATION, KIND_OFFSET)
+KIND_REPORT = "정정 신고 해석"
+KINDS = (KIND_CLAIM, KIND_EXPLANATION, KIND_OFFSET, KIND_REPORT)
 
 
 def _claim_rows(session: Session) -> list[AiLogRow]:
@@ -124,6 +128,44 @@ def _offset_rows(session: Session) -> list[AiLogRow]:
     return rows
 
 
+def _change_text(agency_id, attr_type, value) -> str | None:
+    return None if agency_id is None else f"{agency_id} {attr_type} → {value}"
+
+
+def _report_rows(session: Session) -> list[AiLogRow]:
+    rows = []
+    reports = session.execute(
+        select(MasterChangeReport, MasterChange)
+        .outerjoin(MasterChange, MasterChange.change_id == MasterChangeReport.change_id)
+        .order_by(MasterChangeReport.report_id)
+    ).all()
+    for report, change in reports:
+        if change is not None:
+            human = _change_text(change.agency_id, change.attr_type, change.new_value)
+        elif report.decided_by is not None:
+            human = "기각"
+        else:
+            human = None
+        rows.append(
+            AiLogRow(
+                kind=KIND_REPORT,
+                target=f"master_change_report:{report.report_id}",
+                rebate_id=None,
+                ai_output=_change_text(
+                    report.ai_agency_id, report.ai_attr_type, report.ai_new_value
+                ),
+                human_decision=human,
+                human_reason=report.decision_reason,
+                agreed=report.agreed,
+                fallback_used=report.fallback_used,
+                authority_raised=False,
+                model=report.model,
+                created_at=report.created_at,
+            )
+        )
+    return rows
+
+
 def _stats(kind: str, rows: list[AiLogRow]) -> AiKindStats:
     mine = [r for r in rows if r.kind == kind]
     compared = [r for r in mine if r.agreed is not None]
@@ -141,8 +183,13 @@ def _stats(kind: str, rows: list[AiLogRow]) -> AiKindStats:
 
 
 def ai_log(session: Session) -> AiLogOut:
-    """세 AI 의 기록(최신순)과 종류별 · 전체 집계."""
-    rows = _claim_rows(session) + _explanation_rows(session) + _offset_rows(session)
+    """네 AI 의 기록(최신순)과 종류별 · 전체 집계."""
+    rows = (
+        _claim_rows(session)
+        + _explanation_rows(session)
+        + _offset_rows(session)
+        + _report_rows(session)
+    )
     stats = [_stats(kind, rows) for kind in KINDS]
     total = AiKindStats(
         kind="전체",

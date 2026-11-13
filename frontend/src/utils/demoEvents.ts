@@ -12,6 +12,8 @@ export const MASTER_CHANGE_DEMOS = [
     attrType: '등록계좌' as CorrectableAttr,
     newValue: '신한 123-45-678901',
     reportedText: '정산 계좌를 신한은행으로 옮겼습니다.',
+    /** 신고 문장 AI 해석(19)에 넣는 문장. 대리점이 문장에 있어야 가드를 통과한다. */
+    sentence: 'D-037 대리점입니다. 정산 계좌를 신한 123-45-678901 로 옮겼습니다.',
   },
   {
     label: 'D-041 주소 정정(새 그룹)',
@@ -19,6 +21,7 @@ export const MASTER_CHANGE_DEMOS = [
     attrType: '주소' as CorrectableAttr,
     newValue: '대전시 중앙로 260',
     reportedText: '본사를 대전시 중앙로 260 으로 이전했습니다.',
+    sentence: 'D-041 대리점입니다. 본사를 대전시 중앙로 260 으로 이전했습니다.',
   },
 ]
 

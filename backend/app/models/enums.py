@@ -168,3 +168,11 @@ class SalesAlternative(StrEnum):
     PARTIAL_OFFSET = "부분 상계"
     # 상계하지 않고 장려금은 지급하되, 대리점에게 연체 채권 회수 약정을 받는다
     PAY_WITH_PLAN = "지급 후 회수 약정"
+
+
+class ReportStatus(StrEnum):
+    """정정 신고 문장 한 건의 처리 상태(19). AI 해석 뒤 영업지원팀이 적용하거나 기각한다."""
+
+    AWAITING = "확인대기"
+    APPLIED = "적용"
+    DISMISSED = "기각"

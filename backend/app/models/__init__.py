@@ -14,7 +14,7 @@ from app.models.explanation import (
     ExplanationReply,
     ExplanationRequest,
 )
-from app.models.master_change import MasterChange
+from app.models.master_change import MasterChange, MasterChangeReport
 from app.models.offset import OffsetProposal
 from app.models.payment import BankReply, PaymentOrder
 from app.models.rebate import RebateClaim
@@ -45,6 +45,7 @@ __all__ = [
     "GroupVersion",
     "IdentityAttribute",
     "MasterChange",
+    "MasterChangeReport",
     "OffsetProposal",
     "PaymentOrder",
     "RebateClaim",

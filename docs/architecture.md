@@ -146,6 +146,7 @@ flowchart TD
 - `explanation_review` 의 대상은 **소명 회신 하나**다(thread_id `explanation_review:explanation_reply:{reply_id}`). 건 상태와 사람 확인 결과는 확인 API 가 서비스(`services/explanation.py`)로 먼저 적고, 통과했을 때만 그래프를 재개한다(`claim_review` 와 같은 이유). 그래서 `record_decision` 노드가 없고, AI 검토를 건너뛴 확인도 기록이 남는다.
 - `check_claim` 은 모델이 도구를 골라 부르는 반복을 직접 돌린다(주장 하나당 최대 4라운드). 도구가 실제로 돌려준 근거 행만 인정하고, 근거 없이 일치 · 불일치를 말하면 코드가 **확인불가로 내린다**. 종합 판단의 증빙 충분은 모든 주장이 일치일 때만 허용하며, 어기면 1회 다시 생성하고 2회 실패하면 대체 모드다.
 - **반려 → 소명 → 재상신(21)**: 반려 결정에 소명 항목을 함께 보내면 반려된 건마다 소명 요청이 생기고 건이 소명대기가 된다(G1 은 대리점마다 회신이 따로 오므로 3건 · 요청 3개). 회신을 등록하는 순간 `explanation_review` 가 돈다(모델이 없으면 대체 모드). 영업지원팀이 증빙 충분으로 확인하면 건은 관계확인을 거쳐 한도 판정 코드가 바로 다시 판정해 전결대기 · 상신대기로 돌아가고(승인 요청은 같은 그룹 · 같은 달에 열린 것이 있으면 합류, 없으면 새로 생김), 이어서 `claim_review` 가 새로 시작되어 AI 추천과 함께 다시 결재된다. 증빙 부족이면 지급보류 + 추가 소명 요청 작업이다.
+- **정정 신고 해석(19, `master_change_parser`)**: 신고 문장을 AI 가 대리점 · 속성 · 새 값 · 정정일로 옮기고, 코드 가드가 있는 대리점인지 · 문장에 그 대리점(ID 나 이름)과 새 값이 글자 그대로 있는지 · 지금 값과 다른지 본다(AI 가 지어낸 값으로 그룹이 바뀌는 것을 막음). 문제면 1회 다시, 2회 실패나 모델 없음이면 대체 모드로 사람이 폼에 직접 넣는다. 해석은 `master_change_report` 에 [주장] 으로 저장되고 화면 폼을 채운다. 적용은 확인 API 가 사람이 확인 · 수정한 값으로 20 의 정정 서비스를 부른 뒤 그래프를 재개한다(그래서 그래프에 apply 노드가 없다). AI 해석과 다른 값으로 적용하면 사유가 필요하고(25), 기각도 사유가 필요하다.
 - **AI 와 다르면 사유 필수(25)**: 전결 · 승인 요청 결정, 소명 확인, 상계 재무 결정에서 사람이 기다리는 AI 출력과 다르게 고르는데 사유가 비었으면 422 다(`services/ai_agreement.py`). 다르게 결정하는 것 자체는 막지 않는다(최종 결정은 사람). 결정 API 는 서비스로 상태를 바꾼 뒤 · 그래프를 재개하기 전에 검사해, 422 면 요청 트랜잭션이 롤백되고 틀린 결정이 체크포인트에 저장되지 않는다(17 의 재개 함정). "소명 먼저" 추천은 반려 + 소명 요청과 일치로 본다. 대체 모드는 비교할 출력이 없어 사유를 요구하지 않는다. 세 AI 의 출력 · 결정 · 일치율은 `GET /api/ai/recommendations`(AI 기록 화면)에 모이고, 일치율의 분모는 AI 출력이 있고 사람이 결정한 건이다.
 
 ```mermaid
@@ -184,10 +185,11 @@ flowchart TD
   end
 
   subgraph MC["master_change_parser · 정정 신고 해석"]
-    M0(["정정 신고 문장"]) --> M1["parse · AI<br/>대리점 · 속성 · 이전 값 · 새 값"]
-    M1 --> M2{"verify · 가드<br/>대리점·속성 존재 · 이전 값 일치"}
-    M2 -->|"통과 · 2회 실패 시 직접 입력"| M3[["human_decision · interrupt<br/>영업지원팀 확인"]]
-    M3 -->|확정| M4["apply_change · 코드<br/>그룹 재계산 · 새 버전<br/>영향 건에 재검토필요"]
+    M0(["정정 신고 문장 [주장]"]) --> M1["parse · AI<br/>대리점 · 속성 · 새 값 · 정정일"]
+    M1 --> M2{"verify · 가드<br/>있는 대리점 · 문장에 대리점과 새 값이 있나<br/>지금 값과 다른가"}
+    M2 -->|"문제 · 1회차"| M1
+    M2 -->|"통과 · 2회 실패면 대체 모드(직접 입력)"| M3[["human_decision · interrupt<br/>영업지원팀 확인 · 수정"]]
+    M3 -->|"확인 API 가 20 정정 서비스로 적용한 뒤 재개"| M4["정정 적용(20) · 코드<br/>그룹 재계산 · 새 버전<br/>결재 대기 건 재판정"]
   end
 
   N9 -->|"소명 먼저"| E0
@@ -223,6 +225,7 @@ flowchart TD
 - **22 `feat/ext-ar-offset` 은 `OFFSET_PROPOSAL` · `AR_ADJUSTMENT` 를 더한다 [가정].** 관련자 그룹 건이 승인되면(결정 API 와 같은 트랜잭션) 그룹 구성원의 90일 초과 연체 채권 잔액을 보고, 남은 잔액이 있으면 건마다 제안 1개를 만들어 승인 → 상계검토로 보낸다(재무 상계 검토 작업). 상계 한도 `max_offset_krw` = min(지급할 남은 금액, 그룹 연체 잔액 − 같은 그룹 열린 제안이 잡은 몫)이고 코드가 계산한다. 단독 대리점의 연체는 재무 일반 회수 업무로 보고 대상에서 뺐다. 제안 상태: 재무검토 → 동의대기(재무가 1 ~ 한도에서 상계액 결정) → 상계확정(대리점 동의 [모의]) · 재무반려(상계하지 않음) · 동의거절 · 취소(정정 신고). 상계확정이면 상계액을 이 건 대리점 채권 먼저 · 오래된 것 먼저 나눠 `AR_ADJUSTMENT`(출처 `가정`)에 남기고(원본 `outstanding_krw` 는 그대로, 지금 잔액 = 원본 − 조정 합계), 전액이면 상계검토 → 상계완료, 일부면 상계검토에 남아 재무가 차액을 지급 지시한다. 재무반려 · 동의거절이면 전액 지급 지시. 결정 · 동의 전 상계검토 건의 지급 지시는 409. AI 추천 상계액은 `AI_RECOMMENDATION` 과 뜻이 달라(18 과 같은 이유) 제안 행에 직접 두므로 `rec_id` 는 없고, 단일 `ar_id` 대신 `group_id` 로 대상 채권을 찾는다. 제안 상태 변화는 `EVENT_LOG`(`entity_type` = `offset_proposal`)에 남는다.
 - **23 `feat/dept-impact-sales-opinion` 은 `OFFSET_PROPOSAL` 에 영업 의견 · 회수 약정 컬럼을 더한다(부서 영향).** 제안이 생기면 영업지원팀에 "상계 영업 의견" 작업(상태 전이가 아닌 작업)이 열린다. 영업지원팀 · 영업임원은 재무 결정 전에 대리점 관계 부담을 보고 대안 [주장] 을 낸다: 전액 상계 · 부분 상계(1원 ~ 한도 미만 금액) · 지급 후 회수 약정. 의견은 AI 상계액 추천의 사실(`영업_의견`)과 재무 화면(입력칸 처음 값)에 들어가지만 결정을 막지는 않는다. 재무가 상계하지 않으면서 회수 약정 기한을 넣으면 "지급 후 회수 약정"이고(전액 지급, `collection_due_date`), 재무에 "회수 약정 관리" 작업이 열린다. 재무 결정이 영업 대안과 같은지는 `sales_followed` 로 남는다(의견이 없으면 비어 있음). 의견을 내거나 재무가 결정하면 영업 작업은 닫힌다.
 - **24 `feat/audit-retro-review` 는 표를 더하지 않는다.** 내부감사가 `POST /api/audit/retro-review` 를 부르면 원본에서 승인 · 지급된 건(`original_status` 승인, 지금 지급완료 — 앱 결재 경로를 거친 6월분은 빠짐) 196건을 그 달 건 전체와 지금 버전 그룹으로 한도 판정 코드(06 `decide_authority`)에 다시 넣는다. 최소 결재권자가 원본 결재자보다 높은 건마다 `TASK`(내부감사 · 사후 검토, 상태 전이가 아닌 작업)를 연다. 원본 기준 G1 15건 22,238,349원. 같은 건에 사후 검토 작업이 이미 있으면 다시 만들지 않는다. 1~5월 건의 판정 컬럼(`min_authority` 등)에는 쓰지 않는다(06: 판정 당시 그룹의 뜻 보존).
+- **19 `feat/master-change-parser-graph` 는 `MASTER_CHANGE_REPORT` 를 더한다.** 신고 문장 원문(`provenance` 주장) · AI 해석 컬럼(`ai_*`, 가드 문제 `problems`, `verified` · `fallback_used`) · 영업지원팀 확인(상태 확인대기 → 적용 · 기각, 적용이면 `change_id` 로 정정 건, `agreed` = AI 해석과 같은 값으로 적용했는지)을 한 행에 둔다. 해석 없이 폼만 쓰는 20 의 정정 API 도 그대로 남는다.
 - **26 `feat/demo-scenario-runner` 는 표를 더하지 않는다.** 시연 패널은 설계안 7장 시나리오 3개를 버튼으로 진행한다. 여러 건을 한 번에 처리하는 두 이벤트만 시연 API 로 둔다: `POST /api/demo/events/standalone-approve`(대상월 단독 전결대기 건을 영업지원팀 전결 승인 + 재무 지급 지시, 사유 "시연 일괄 처리(시나리오 1)" — 사람이 누를 때와 같은 서비스 · 사유 검사 · AI 검토 재개 순서), `POST /api/demo/events/bank-replies`(회신대기 지급 전부에 은행 회신 [모의]). 정정 신고 · G1 승인 / 반려 + 소명 요청 · 소명 회신은 업무 API 를 그 부서 시연 인물로 부른다. 그룹 건(G1)은 일괄에서 빼 영업임원 결재 · 상계 검토를 직접 보여 준다.
 
 ```mermaid
@@ -278,6 +281,19 @@ erDiagram
     int amount_krw "상계로 줄어든 금액"
     string provenance "가정"
     datetime applied_at
+  }
+  MASTER_CHANGE_REPORT {
+    int report_id PK
+    string raw_text "신고 문장 · 주장"
+    string status "확인대기 적용 기각"
+    string ai_agency_id "AI 해석 · 주장"
+    string ai_attr_type
+    string ai_new_value
+    date ai_effective_date
+    json problems "가드 문제 · 대체 모드 이유"
+    bool fallback_used
+    int change_id FK "적용이면 정정 건"
+    bool agreed "AI 해석과 같은 값으로 적용"
   }
   MASTER_CHANGE {
     int change_id PK
@@ -503,6 +519,7 @@ erDiagram
   REBATE_CLAIM ||--o{ EXPLANATION_REQUEST : "소명 요청"
   EXPLANATION_REQUEST ||--o| EXPLANATION_REPLY : "회신"
   EXPLANATION_REPLY ||--o{ EXPLANATION_CHECK : "주장 대조"
+  MASTER_CHANGE_REPORT |o--o| MASTER_CHANGE : "적용"
   REBATE_CLAIM ||--o{ OFFSET_PROPOSAL : "상계 제안"
   RELATED_GROUP ||--o{ OFFSET_PROPOSAL : "상계 대상 그룹"
   OFFSET_PROPOSAL ||--o{ AR_ADJUSTMENT : "잔액 조정"

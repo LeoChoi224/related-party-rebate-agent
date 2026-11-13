@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from app.models.enums import CheckVerdict, ExplanationJudgement
 from app.schemas.ai_recommendation import ClaimAssessment
 from app.schemas.explanation import CheckResult, ExplanationAssessment
+from app.schemas.master_change import MasterChangeParse
 from app.schemas.offset import OffsetAdvice
 from app.services.approval_authority import has_authority
 
@@ -97,5 +98,45 @@ def check_offset_advice(advice: OffsetAdvice, *, max_offset_krw: int) -> GuardRe
         problems.append(
             f"추천 상계액 {advice.offset_amount_krw:,}원이 0~상계 한도 "
             f"{max_offset_krw:,}원 밖입니다"
+        )
+    return GuardResult(ok=not problems, problems=problems)
+
+
+def _squash(text: str) -> str:
+    """띄어쓰기 차이("중앙로 260" · "중앙로260")를 무시하고 비교하려고 공백을 모두 뺀다."""
+    return "".join(text.split())
+
+
+def check_master_change_parse(
+    parse: MasterChangeParse,
+    *,
+    raw_text: str,
+    agency_names: dict[str, str],
+    current_values: dict[tuple[str, str], str],
+) -> GuardResult:
+    """정정 신고 해석을 문장 · 대리점 목록 · 지금 값과 맞춰 본다(19). 문제가 있으면 다시 생성할 대상이다.
+
+    AI 가 문장에 없는 대리점 · 값을 지어내면 그대로 그룹이 바뀌므로, 문장에 그 글자가 실제로 있는지 본다.
+    """
+    problems = []
+    if not 0 <= parse.confidence <= 1:
+        problems.append(f"확신도 {parse.confidence} 이(가) 0~1 밖입니다")
+    name = agency_names.get(parse.agency_id)
+    if name is None:
+        problems.append(f"{parse.agency_id} 은(는) 없는 대리점입니다")
+    elif parse.agency_id not in raw_text and _squash(name) not in _squash(raw_text):
+        problems.append(
+            f"문장에 {parse.agency_id}({name}) 이(가) 나오지 않습니다. 문장 속 대리점을 쓰세요"
+        )
+    value = parse.new_value.strip()
+    if not value:
+        problems.append("새 값이 비어 있습니다")
+    elif _squash(value) not in _squash(raw_text):
+        problems.append(
+            f"새 값 '{value}' 이(가) 문장에 없습니다. 문장의 글자를 그대로 옮기세요"
+        )
+    elif current_values.get((parse.agency_id, parse.attr_type)) == value:
+        problems.append(
+            f"{parse.agency_id} 의 {parse.attr_type} 는 이미 '{value}' 입니다"
         )
     return GuardResult(ok=not problems, problems=problems)
