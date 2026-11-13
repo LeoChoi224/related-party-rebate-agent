@@ -160,7 +160,7 @@ function ReplyForm({ expId, busy, run }: RunProps & { expId: number }) {
     <div className="decision-form">
       <p className="muted">
         <ProvenanceBadge provenance="모의" /> 대리점 회신을 시연으로 넣습니다. 실제 업무에서는
-        대리점이 보내는 회신입니다.
+        대리점이 보내는 회신입니다. 등록하면 AI 검토(주장 대조)가 바로 돌아 몇 초 걸릴 수 있습니다.
       </p>
       <label>
         회신 내용

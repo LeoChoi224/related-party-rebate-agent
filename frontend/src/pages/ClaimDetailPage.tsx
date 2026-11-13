@@ -295,8 +295,16 @@ function NextAction({ detail, busy, error, run }: NextActionProps) {
     body = (
       <DecisionForm
         busy={busy}
-        onDecide={(decision, reason) =>
-          run(() => decideClaim(detail.rebate_id, { decision, reason, actor, role }))
+        onDecide={(decision, reason, explanationItems) =>
+          run(() =>
+            decideClaim(detail.rebate_id, {
+              decision,
+              reason,
+              actor,
+              role,
+              explanation_items: explanationItems,
+            }),
+          )
         }
       />
     )
@@ -313,8 +321,16 @@ function NextAction({ detail, busy, error, run }: NextActionProps) {
         </p>
         <DecisionForm
           busy={busy}
-          onDecide={(decision, reason) =>
-            run(() => decideApproval(approval.request_id, { decision, reason, actor, role }))
+          onDecide={(decision, reason, explanationItems) =>
+            run(() =>
+              decideApproval(approval.request_id, {
+                decision,
+                reason,
+                actor,
+                role,
+                explanation_items: explanationItems,
+              }),
+            )
           }
         />
       </>

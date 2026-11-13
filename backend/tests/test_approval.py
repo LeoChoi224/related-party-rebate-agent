@@ -208,6 +208,7 @@ def test_api_executive_approves_then_second_try_is_409(client, api_engine):
         "decision": "승인",
         "decided_by": "박임원",
         "rebate_ids": G1_CLAIMS,
+        "explanation_ids": [],
     }
     assert decide_request(client, decision="승인", **EXECUTIVE).status_code == 409
     with Session(api_engine) as session:
@@ -237,7 +238,11 @@ def test_api_support_decides_claim(client):
         f"/api/claims/{D001_JUNE}/decision", json={"decision": "승인", **SUPPORT}
     )
     assert res.status_code == 200
-    assert res.json() == {"rebate_id": D001_JUNE, "status": "승인"}
+    assert res.json() == {
+        "rebate_id": D001_JUNE,
+        "status": "승인",
+        "explanation_ids": [],
+    }
 
 
 @pytest.mark.parametrize(

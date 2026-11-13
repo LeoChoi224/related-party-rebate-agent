@@ -126,16 +126,14 @@ def test_scenario_three_end_to_end(app, client, api_engine, fake_explanation_mod
         t["task_type"] == "소명 요청" and t["ref_id"] == rebate_id for t in tasks
     )
 
-    replied = reply_to(client, exp["exp_id"]).json()
-    assert replied["status"] == "회신됨"
-    assert replied["reply"]["provenance"] == "모의"
-
     app.dependency_overrides[get_review_model] = lambda: mismatch_model(
         fake_explanation_model, api_engine
     )
-    reviewed = client.post(f"/api/explanations/{replied['reply']['reply_id']}/review")
-    assert reviewed.status_code == 200, reviewed.text
-    reply = reviewed.json()["reply"]
+    replied = reply_to(client, exp["exp_id"]).json()
+    assert replied["status"] == "회신됨"
+    assert replied["reply"]["provenance"] == "모의"
+    # 회신을 등록하는 순간 AI 검토가 돌아 주장별 대조 결과가 이미 저장되어 있다(21).
+    reply = replied["reply"]
     assert reply["ai_judgement"] == "증빙 부족"
     assert [c["verdict"] for c in reply["checks"]] == ["불일치"]
 
@@ -160,7 +158,7 @@ def test_scenario_three_end_to_end(app, client, api_engine, fake_explanation_mod
     assert any(t["task_type"] == "추가 소명 요청" for t in tasks)
 
 
-def test_sufficient_confirmation_returns_to_relation_check_without_ai(client):
+def test_sufficient_confirmation_resubmits_to_approval_path_without_ai(client):
     """AI 검토를 한 번도 안 돌려도 영업지원팀이 확인할 수 있다. 비교할 AI 판단이 없어 agreed 는 비어 있다."""
     rebate_id = reject_standalone(client)
     exp = request_explanation(client, rebate_id).json()
@@ -172,16 +170,22 @@ def test_sufficient_confirmation_returns_to_relation_check_without_ai(client):
     )
     assert done.status_code == 200
     body = detail(client, rebate_id)
-    assert body["status"] == "관계확인"
+    # 증빙 충분이면 관계확인을 거쳐 바로 다시 판정되어 결재 경로로 돌아간다(재상신, 21).
+    assert body["status"] == "전결대기"
     assert body["explanations"][0]["reply"]["agreed"] is None
-    assert body["events"][-1]["reason"] == "소명 확인: 증빙 충분"
+    assert [e["to_status"] for e in body["events"]][-3:] == [
+        "소명대기",
+        "관계확인",
+        "전결대기",
+    ]
+    assert body["events"][-2]["reason"] == "소명 확인: 증빙 충분"
 
 
 def test_no_model_review_is_fallback_with_original_text(client):
     rebate_id = reject_standalone(client)
     exp = request_explanation(client, rebate_id).json()
-    reply_id = reply_to(client, exp["exp_id"]).json()["reply"]["reply_id"]
-    body = client.post(f"/api/explanations/{reply_id}/review").json()
+    # 모델이 없어도 회신을 등록하면 AI 검토가 대체 모드로 끝난다(21).
+    body = reply_to(client, exp["exp_id"]).json()
     assert body["reply"]["fallback_used"] is True
     assert body["reply"]["ai_judgement"] is None
     assert body["reply"]["raw_text"] == REPLY
@@ -248,7 +252,7 @@ def test_review_conflicts(app, client, api_engine, fake_explanation_model):
     # 회신 전에는 검토할 수 없다.
     assert client.post("/api/explanations/1/review").status_code == 404
     reply_id = reply_to(client, exp_id).json()["reply"]["reply_id"]
-    assert client.post(f"/api/explanations/{reply_id}/review").status_code == 200
+    # 회신을 등록할 때 이미 검토해 확인을 기다리므로 다시 시작할 수 없다(21).
     again = client.post(f"/api/explanations/{reply_id}/review")
     assert again.status_code == 409
     assert "이미 사람 결정을 기다리고" in again.json()["detail"]
