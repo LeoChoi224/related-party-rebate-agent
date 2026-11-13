@@ -14,6 +14,7 @@ from app.models.explanation import (
     ExplanationReply,
     ExplanationRequest,
 )
+from app.models.master_change import MasterChange
 from app.models.payment import BankReply, PaymentOrder
 from app.models.rebate import RebateClaim
 from app.models.receivable import ARItem
@@ -41,6 +42,7 @@ __all__ = [
     "GroupMember",
     "GroupVersion",
     "IdentityAttribute",
+    "MasterChange",
     "PaymentOrder",
     "RebateClaim",
     "RelatedGroup",

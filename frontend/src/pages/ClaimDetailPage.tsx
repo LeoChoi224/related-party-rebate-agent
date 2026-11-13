@@ -8,7 +8,13 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { decideApproval } from '../api/approvals.ts'
 import { ApiError } from '../api/client.ts'
-import { decideClaim, getClaim, orderPayment, reviewClaim } from '../api/claims.ts'
+import {
+  decideClaim,
+  getClaim,
+  orderPayment,
+  rejudgeClaim,
+  reviewClaim,
+} from '../api/claims.ts'
 import AiPanel from '../components/AiPanel.tsx'
 import { sendBankReply } from '../api/payments.ts'
 import AuthorityNotice from '../components/AuthorityNotice.tsx'
@@ -349,6 +355,25 @@ function NextAction({ detail, busy, error, run }: NextActionProps) {
               {result}
             </button>
           ))}
+        </div>
+      </>
+    )
+  } else if (detail.status === ClaimStatus.NEEDS_REVIEW) {
+    title = '재판정'
+    body = (
+      <>
+        <p className="muted">
+          정정 신고로 판정 단위가 바뀐 건입니다. 지금 그룹으로 한도를 다시 계산해 결재 경로에
+          올립니다(AI 가 아니라 한도 판정 코드의 계산입니다).
+        </p>
+        <div className="actions">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(() => rejudgeClaim(detail.rebate_id, actor, role))}
+          >
+            재판정
+          </button>
         </div>
       </>
     )

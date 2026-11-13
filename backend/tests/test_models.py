@@ -88,6 +88,7 @@ def test_create_all_makes_erd_tables(db_engine):
         "group_member",
         "group_version",
         "identity_attr",
+        "master_change",
         "payment_order",
         "rebate_claim",
         "related_group",

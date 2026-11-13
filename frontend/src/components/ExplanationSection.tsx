@@ -37,6 +37,7 @@ const STATUS_TONE: Record<ExplanationStatus, string> = {
   회신대기: 'wait',
   회신됨: 'wait',
   확인완료: 'ok',
+  취소: 'neutral',
 }
 
 type Props = {

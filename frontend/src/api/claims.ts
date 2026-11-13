@@ -1,9 +1,10 @@
 /**
- * 장려금 건 API: 처리함 목록, 건 상세, 대상월 접수, 전결 결정, 지급 지시, AI 검토.
+ * 장려금 건 API: 처리함 목록, 건 상세, 대상월 접수, 전결 결정, 지급 지시, AI 검토, 재판정.
  */
 import type { AiReview } from '../types/aiReview.ts'
 import type { ClaimDecisionResult, DecisionRequest } from '../types/approval.ts'
 import type { ClaimStatus } from '../types/enums.ts'
+import type { RejudgeResult } from '../types/masterChange.ts'
 import type { PaymentOrderResult } from '../types/payment.ts'
 import type { ClaimDetail, ClaimListItem, IntakeResult } from '../types/rebate.ts'
 import { api } from './client.ts'
@@ -56,4 +57,16 @@ export function orderPayment(
 /** AI 검토를 사람 결정 앞까지 돌린다. 결정 대기가 아니거나 이미 검토했으면 409. */
 export function reviewClaim(rebateId: string): Promise<AiReview> {
   return api.post<AiReview>(`/claims/${encodeURIComponent(rebateId)}/review`)
+}
+
+/** 정정 신고로 재검토필요가 된 건을 영업지원팀이 다시 판정한다. 재검토필요가 아니면 409. */
+export function rejudgeClaim(
+  rebateId: string,
+  actor: string,
+  role: string,
+): Promise<RejudgeResult> {
+  return api.post<RejudgeResult>(`/claims/${encodeURIComponent(rebateId)}/rejudge`, {
+    actor,
+    role,
+  })
 }

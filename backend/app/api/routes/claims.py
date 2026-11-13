@@ -16,11 +16,13 @@ from app.models import Agency, RebateClaim, RelatedGroup
 from app.models.enums import ClaimStatus
 from app.schemas.ai_recommendation import AiReviewOut
 from app.schemas.approval import ClaimDecisionResult, DecisionRequest
+from app.schemas.master_change import RejudgeRequest, RejudgeResult
 from app.schemas.payment import PaymentOrderRequest, PaymentOrderResult
 from app.schemas.rebate import ClaimDetail, ClaimListItem, IntakeResult
 from app.services.approval import decide_claim
 from app.services.claim_detail import TARGET_CLAIM, get_claim_detail
 from app.services.intake import intake_period
+from app.services.master_change import latest_request_id, rejudge_claim
 from app.services.payment import order_payment
 
 router = APIRouter(prefix="/claims", tags=["claims"])
@@ -179,4 +181,31 @@ def order(
         status=payment.status,
         # 같은 세션이라 전이가 끝난 건 객체가 그대로 돌아온다.
         claim_status=session.get(RebateClaim, rebate_id).status,
+    )
+
+
+@router.post(
+    "/{rebate_id}/rejudge",
+    responses={
+        403: {"description": "영업지원팀이 아님"},
+        404: {"description": "장려금 건이 없음"},
+        409: {"description": "재검토필요 건이 아님"},
+    },
+)
+def rejudge(rebate_id: str, body: RejudgeRequest, session: SessionDep) -> RejudgeResult:
+    """정정 신고로 재검토필요가 된 건을 지금 그룹으로 다시 판정해 결재 경로에 올린다."""
+    try:
+        claim = rejudge_claim(session, rebate_id, actor=body.actor, role=body.role)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return RejudgeResult(
+        rebate_id=claim.rebate_id,
+        status=claim.status,
+        min_authority=claim.min_authority,
+        group_sum_krw=claim.group_sum_krw,
+        approval_request_id=(
+            latest_request_id(session, rebate_id)
+            if claim.status == ClaimStatus.AWAITING_EXECUTIVE
+            else None
+        ),
     )
