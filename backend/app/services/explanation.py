@@ -30,6 +30,7 @@ from app.schemas.explanation import (
     ExplanationOut,
     ExplanationReplyOut,
 )
+from app.services.ai_agreement import require_reason
 from app.services.approval import InsufficientAuthorityError
 from app.services.claim_state import InvalidTransitionError, transition
 from app.services.rejudge import rejudge_claims
@@ -160,6 +161,11 @@ def confirm_explanation(
             f"확인 전 회신만 확인할 수 있습니다: {request.status} (회신 {reply_id})"
         )
     claim = session.get(RebateClaim, request.rebate_id)
+    agreed = None if reply.ai_judgement is None else reply.ai_judgement == judgement
+    # AI 판단과 다르면 사유가 있어야 한다(25). 상태를 바꾸기 전에 막는다.
+    require_reason(
+        agreed, reason, ai_output=reply.ai_judgement or "", human=str(judgement)
+    )
     # 전이표가 소명대기가 아닌 건을 막는다(409). 확인 결과는 전이가 통과한 뒤에 적는다.
     transition(
         session,
@@ -183,9 +189,7 @@ def confirm_explanation(
     reply.review_reason = reason.strip() or None
     reply.reviewed_by = actor
     reply.reviewed_at = func.now()
-    reply.agreed = (
-        None if reply.ai_judgement is None else reply.ai_judgement == judgement
-    )
+    reply.agreed = agreed
     request.status = ExplanationStatus.CONFIRMED
     session.flush()
     return reply, claim

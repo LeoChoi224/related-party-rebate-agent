@@ -29,6 +29,7 @@ export default function AppLayout() {
         <NavLink to="/tasks">작업</NavLink>
         <NavLink to="/master-changes">정정 신고</NavLink>
         <NavLink to="/events">이벤트 이력</NavLink>
+        <NavLink to="/ai-log">AI 기록</NavLink>
         {role === '시연 관리자' && <NavLink to="/demo">시연 패널</NavLink>}
       </nav>
       <main className="app-main">

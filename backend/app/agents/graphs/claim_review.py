@@ -39,6 +39,7 @@ from app.models import AIRecommendation, RebateClaim
 from app.models.enums import ClaimStatus, Decision
 from app.schemas.ai_recommendation import ClaimAssessment
 from app.schemas.rebate import ClaimDetail
+from app.services.ai_agreement import recommendation_matches
 from app.services.approval_authority import required_authority
 from app.services.claim_detail import get_claim_detail, review_unit
 
@@ -221,8 +222,13 @@ def record_decision(
     rec.human_reason = d["reason"].strip() or None
     rec.decided_by = d["actor"]
     rec.decided_at = func.now()
+    # "소명 먼저"는 반려하면서 소명을 요청한 결정과 같다(21 · 25).
     rec.agreed = (
-        None if rec.recommendation is None else rec.recommendation == d["decision"]
+        None
+        if rec.recommendation is None
+        else recommendation_matches(
+            rec.recommendation, d["decision"], explained=d.get("explained", False)
+        )
     )
     runtime.context.session.flush()
     return {}
@@ -301,8 +307,12 @@ def record_human_decision(
     decision: Decision,
     reason: str,
     actor: str,
+    explained: bool = False,
 ) -> bool:
-    """검사를 통과한 결정을 기다리는 검토에 넣는다. 검토가 없으면 아무것도 안 하고 False."""
+    """검사를 통과한 결정을 기다리는 검토에 넣는다. 검토가 없으면 아무것도 안 하고 False.
+
+    explained 는 반려와 함께 소명을 요청했는지다("소명 먼저" 추천과의 일치 판단에 쓴다).
+    """
     graph = build_claim_review(checkpointer)
     key = f"{target_type}:{target_id}"
     if not pending_interrupts(graph, key):
@@ -310,7 +320,12 @@ def record_human_decision(
     resume_run(
         graph,
         key,
-        {"decision": str(decision), "reason": reason, "actor": actor},
+        {
+            "decision": str(decision),
+            "reason": reason,
+            "actor": actor,
+            "explained": explained,
+        },
         context=ReviewContext(session=session),
     )
     return True

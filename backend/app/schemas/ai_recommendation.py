@@ -2,6 +2,7 @@
 
 ClaimAssessment: claim_review 그래프가 LLM 에게 받는 구조화 출력. 필드 설명이 그대로 LLM 지시가 된다.
 AiReviewOut: 건 상세의 AI 추천 패널 응답.
+AiLogRow · AiKindStats · AiLogOut: AI 추천 기록 화면(25). 세 AI 의 출력과 사람 결정 · 일치율.
 """
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -55,3 +56,41 @@ class AiReviewOut(BaseModel):
     decided_by: str | None
     decided_at: UtcDatetime | None
     created_at: UtcDatetime
+
+
+class AiLogRow(BaseModel):
+    """AI 추천 기록 한 줄(25). 세 AI 의 출력과 사람 결정을 같은 모양으로 맞춘다.
+
+    ai_output 은 대체 모드면 비어 있다. agreed 는 사람이 결정하기 전이거나 대체 모드면 비어 있다.
+    rebate_id 는 화면이 건 상세로 이동할 때 쓰는 건(승인 요청이면 포함 건 중 첫 건).
+    """
+
+    kind: str
+    target: str
+    rebate_id: str | None
+    ai_output: str | None
+    human_decision: str | None
+    human_reason: str | None
+    agreed: bool | None
+    fallback_used: bool
+    authority_raised: bool
+    model: str | None
+    created_at: UtcDatetime
+
+
+class AiKindStats(BaseModel):
+    """AI 종류별 집계. agreement_rate = agreed / compared(비교한 결정이 없으면 비어 있음)."""
+
+    kind: str
+    total: int
+    fallback: int
+    decided: int
+    compared: int
+    agreed: int
+    agreement_rate: float | None
+    authority_raised: int
+
+
+class AiLogOut(BaseModel):
+    stats: list[AiKindStats]
+    rows: list[AiLogRow]

@@ -20,8 +20,9 @@ from app.schemas.approval import ClaimDecisionResult, DecisionRequest
 from app.schemas.master_change import RejudgeRequest, RejudgeResult
 from app.schemas.payment import PaymentOrderRequest, PaymentOrderResult
 from app.schemas.rebate import ClaimDetail, ClaimListItem, IntakeResult
+from app.services.ai_agreement import check_claim_decision
 from app.services.approval import decide_claim
-from app.services.claim_detail import TARGET_CLAIM, get_claim_detail
+from app.services.claim_detail import TARGET_CLAIM, get_claim_detail, review_unit
 from app.services.explanation import request_explanations
 from app.services.intake import intake_period
 from app.services.master_change import rejudge_claim
@@ -129,7 +130,19 @@ def decide(
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    # 검사를 통과한 결정만 그래프에 넣는다(403 · 409 면 여기까지 오지 않는다).
+    # AI 추천과 다르면 사유가 있어야 한다(25). 그래프를 재개하기 전에 막아야 틀린 결정이 저장되지 않는다.
+    # 여기서 422 가 나면 요청 트랜잭션이 롤백되어 위 상태 변경도 취소된다.
+    target_type, target_id = review_unit(session, rebate_id)
+    explained = bool(body.explanation_items)
+    check_claim_decision(
+        session,
+        target_type,
+        target_id,
+        decision=body.decision,
+        reason=body.reason,
+        explained=explained,
+    )
+    # 검사를 통과한 결정만 그래프에 넣는다(403 · 409 · 422 면 여기까지 오지 않는다).
     record_human_decision(
         session,
         request.app.state.checkpointer,
@@ -138,6 +151,7 @@ def decide(
         decision=body.decision,
         reason=body.reason,
         actor=body.actor,
+        explained=explained,
     )
     # 반려와 함께 소명을 요청하면 건이 소명대기로 넘어간다(21).
     explanation_ids = request_explanations(

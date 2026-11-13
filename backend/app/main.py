@@ -21,6 +21,7 @@ from app.api.router import api_router
 from app.core.config import FRONTEND_DIST
 from app.core.database import engine as default_engine
 from app.seed.seeder import reset_database
+from app.services.ai_agreement import ReasonRequiredError
 from app.services.approval import InsufficientAuthorityError
 from app.services.claim_state import InvalidTransitionError
 
@@ -60,6 +61,11 @@ def insufficient_authority_handler(
     return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
+def reason_required_handler(request: Request, exc: ReasonRequiredError) -> JSONResponse:
+    """AI 추천과 다른 결정에 사유가 없으면 입력이 모자란 것이라 422(25)."""
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_app_logging()
@@ -82,6 +88,7 @@ def create_app(
     app.add_exception_handler(
         InsufficientAuthorityError, insufficient_authority_handler
     )
+    app.add_exception_handler(ReasonRequiredError, reason_required_handler)
     app.include_router(api_router)
 
     # 개발 중에는 화면을 Vite(5173)가 내보내므로 dist 가 없어도 API 는 떠야 한다.
