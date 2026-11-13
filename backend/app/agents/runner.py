@@ -1,5 +1,53 @@
 """그래프 실행기.
 
-thread_id = 대상 건 ID로 그래프를 시작하고, 사람 결정이나 외부 회신이 오면 interrupt 지점에서 재개한다.
-체크포인트가 없으면 업무 DB의 현재 상태에서 다시 시작한다.
+그래프를 대상 건 하나의 스레드로 시작하고, 사람 결정이나 외부 회신이 오면 interrupt 지점에서 재개한다.
+
+- thread_id 는 "그래프이름:건ID"(예: claim_review:RB-00054). 체크포인터 하나를 그래프 셋이 같이 쓰므로,
+  건 ID 만 쓰면 한 건에 도는 claim_review 와 explanation_review 가 서로의 진행 위치를 덮는다.
+- 그래프 이름은 compile(name=...) 으로 붙인 graph.name 을 쓴다.
+- 그래프는 요청마다 app.state.checkpointer 로 compile 한다. 시연 초기화가 체크포인터를 새로 바꾸므로,
+  앱 시작 때 한 번만 compile 하면 옛 체크포인터를 붙잡는다.
+- 체크포인트가 없을 때 업무 DB 에서 어디부터 다시 시작할지는 그래프마다 정한다(17).
 """
+
+from typing import Any
+
+from langchain_core.runnables import RunnableConfig
+from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import Command
+
+
+class InvalidRunStateError(Exception):
+    """기다리는 중인데 또 시작하거나, 기다리지 않는데 재개하려 함. API 는 409 로 돌려준다."""
+
+
+def thread_config(graph: CompiledStateGraph, rebate_id: str) -> RunnableConfig:
+    return {"configurable": {"thread_id": f"{graph.name}:{rebate_id}"}}
+
+
+def pending_interrupts(graph: CompiledStateGraph, rebate_id: str) -> list[Any]:
+    """멈춘 지점이 내놓은 값들. 비어 있으면 기다리는 것이 없다(시작한 적 없는 스레드 포함)."""
+    state = graph.get_state(thread_config(graph, rebate_id))
+    return [item.value for item in state.interrupts]
+
+
+def start_run(
+    graph: CompiledStateGraph, rebate_id: str, inputs: dict[str, Any]
+) -> dict[str, Any]:
+    """그래프를 처음부터 돌린다. interrupt 에서 멈추면 결과에 "__interrupt__" 가 있다."""
+    # 같은 스레드에 새 입력을 넣으면 기다리던 사람 결정이 버려진다.
+    if pending_interrupts(graph, rebate_id):
+        raise InvalidRunStateError(
+            f"{graph.name} · {rebate_id} 는 이미 사람 결정을 기다리고 있습니다"
+        )
+    return graph.invoke(inputs, thread_config(graph, rebate_id))
+
+
+def resume_run(graph: CompiledStateGraph, rebate_id: str, value: Any) -> dict[str, Any]:
+    """멈춘 지점에 사람 결정(value)을 넣고 이어서 돌린다."""
+    # 확인 없이 보내면 오류 없이 그래프가 입력 없이 처음부터 돌아 노드 안에서 엉뚱하게 깨진다.
+    if not pending_interrupts(graph, rebate_id):
+        raise InvalidRunStateError(
+            f"{graph.name} · {rebate_id} 는 기다리는 결정이 없습니다"
+        )
+    return graph.invoke(Command(resume=value), thread_config(graph, rebate_id))
