@@ -49,6 +49,7 @@ from app.models.enums import (
     TaskStatus,
 )
 from app.schemas.offset import ARAdjustmentOut, ARItemOut, OffsetOut
+from app.services.ai_agreement import require_reason
 from app.services.approval import InsufficientAuthorityError
 from app.services.claim_state import InvalidTransitionError, transition
 from app.services.intake import SYSTEM_ACTOR
@@ -431,8 +432,21 @@ def decide_offset(
             f"상계액 {amount_krw}원이 1~상계 한도 {proposal.max_offset_krw:,}원 밖입니다"
         )
 
-    before = proposal.status
     approved = decision == Decision.APPROVE
+    chosen = amount_krw if approved else 0
+    # 상계하지 않기로 한 결정은 AI 가 0원을 권했을 때 일치다.
+    agreed = (
+        None if proposal.ai_amount_krw is None else proposal.ai_amount_krw == chosen
+    )
+    # AI 추천과 다르면 사유가 있어야 한다(25). 바꾸기 전에 막는다.
+    require_reason(
+        agreed,
+        reason,
+        ai_output=f"{proposal.ai_amount_krw:,}원" if agreed is not None else "",
+        human=f"{chosen:,}원",
+    )
+
+    before = proposal.status
     proposal.status = (
         OffsetStatus.AWAITING_CONSENT if approved else OffsetStatus.FINANCE_REJECTED
     )
@@ -441,9 +455,7 @@ def decide_offset(
     proposal.finance_reason = reason.strip() or None
     proposal.decided_by = actor
     proposal.decided_at = func.now()
-    # 상계하지 않기로 한 결정은 AI 가 0원을 권했을 때 일치다.
-    if proposal.ai_amount_krw is not None:
-        proposal.agreed = proposal.ai_amount_krw == (amount_krw if approved else 0)
+    proposal.agreed = agreed
     plan = None if approved else collection_due_date
     proposal.collection_due_date = plan
     proposal.sales_followed = _sales_followed(proposal, approved, plan)

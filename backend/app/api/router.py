@@ -7,6 +7,7 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     agencies,
+    ai,
     approvals,
     audit,
     claims,
@@ -31,3 +32,4 @@ api_router.include_router(explanations.router)
 api_router.include_router(agencies.router)
 api_router.include_router(offsets.router)
 api_router.include_router(audit.router)
+api_router.include_router(ai.router)

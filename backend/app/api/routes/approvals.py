@@ -13,6 +13,7 @@ from app.agents.graphs.claim_review import record_human_decision
 from app.api.deps import SessionDep
 from app.models.enums import Decision
 from app.schemas.approval import ApprovalDecisionResult, DecisionRequest
+from app.services.ai_agreement import check_claim_decision
 from app.services.approval import decide_approval
 from app.services.claim_detail import TARGET_REQUEST
 from app.services.explanation import request_explanations
@@ -44,7 +45,17 @@ def decide(
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    # 검사를 통과한 결정만 그래프에 넣는다(403 · 409 면 여기까지 오지 않는다).
+    # AI 추천과 다르면 사유가 있어야 한다(25). 422 면 요청 트랜잭션이 롤백되어 상태 변경도 취소된다.
+    explained = bool(body.explanation_items)
+    check_claim_decision(
+        session,
+        TARGET_REQUEST,
+        str(request_id),
+        decision=body.decision,
+        reason=body.reason,
+        explained=explained,
+    )
+    # 검사를 통과한 결정만 그래프에 넣는다(403 · 409 · 422 면 여기까지 오지 않는다).
     record_human_decision(
         session,
         request.app.state.checkpointer,
@@ -53,6 +64,7 @@ def decide(
         decision=body.decision,
         reason=body.reason,
         actor=body.actor,
+        explained=explained,
     )
     # 반려와 함께 소명을 요청하면 반려된 건마다 요청이 생기고 건이 소명대기로 넘어간다(21).
     explanation_ids = request_explanations(
