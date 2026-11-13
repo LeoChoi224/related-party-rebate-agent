@@ -77,6 +77,21 @@ class TaskStatus(StrEnum):
     DONE = "완료"
 
 
+class PaymentStatus(StrEnum):
+    """지급 지시 상태. 회신을 받으면 은행 회신 결과와 같은 값이 된다."""
+
+    AWAITING_REPLY = "회신대기"
+    SUCCEEDED = "성공"
+    ACCOUNT_ERROR = "계좌오류"
+
+
+class BankResult(StrEnum):
+    """은행 회신 결과 [모의]. 회신대기는 결과가 아니라서 넣지 않는다."""
+
+    SUCCESS = "성공"
+    ACCOUNT_ERROR = "계좌오류"
+
+
 class MatchAttr(StrEnum):
     """관련자 판정에 세는 속성. 등록계좌와 실입금계좌는 '계좌' 하나로 센다."""
 

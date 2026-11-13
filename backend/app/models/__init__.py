@@ -8,6 +8,7 @@ from app.models.agency import Agency, Deposit, IdentityAttribute
 from app.models.approval import ApprovalItem, ApprovalRequest
 from app.models.base import Base
 from app.models.event_log import EventLog
+from app.models.payment import BankReply, PaymentOrder
 from app.models.rebate import RebateClaim
 from app.models.receivable import ARItem
 from app.models.related_party import (
@@ -23,12 +24,14 @@ __all__ = [
     "Agency",
     "ApprovalItem",
     "ApprovalRequest",
+    "BankReply",
     "Base",
     "Deposit",
     "EventLog",
     "GroupMember",
     "GroupVersion",
     "IdentityAttribute",
+    "PaymentOrder",
     "RebateClaim",
     "RelatedGroup",
     "RelationEdge",
