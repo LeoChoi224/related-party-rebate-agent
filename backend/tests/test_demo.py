@@ -31,6 +31,7 @@ EXPECTED_COUNTS = {
     "explanation_request": 0,
     "explanation_reply": 0,
     "explanation_check": 0,
+    "master_change": 0,
 }
 
 
