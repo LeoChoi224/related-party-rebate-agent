@@ -10,6 +10,7 @@ import ClaimDetailPage from './pages/ClaimDetailPage.tsx'
 import DemoPanelPage from './pages/DemoPanelPage.tsx'
 import EventLogPage from './pages/EventLogPage.tsx'
 import InboxPage from './pages/InboxPage.tsx'
+import MasterChangePage from './pages/MasterChangePage.tsx'
 import TasksPage from './pages/TasksPage.tsx'
 
 /** 아직 만들지 않은 화면 자리. */
@@ -32,6 +33,7 @@ export default function App() {
             <Route index element={<InboxPage />} />
             <Route path="claims/:rebateId" element={<ClaimDetailPage />} />
             <Route path="tasks" element={<TasksPage />} />
+            <Route path="master-changes" element={<MasterChangePage />} />
             <Route path="events" element={<EventLogPage />} />
             <Route path="demo" element={<DemoPanelPage />} />
             <Route path="*" element={<NotReady title="없는 화면" roadmap="-" />} />

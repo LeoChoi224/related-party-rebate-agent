@@ -90,6 +90,8 @@ export const ExplanationStatus = {
   AWAITING_REPLY: '회신대기',
   REPLIED: '회신됨',
   CONFIRMED: '확인완료',
+  /** 정정 신고로 건이 재검토필요로 돌아가 더는 받을 회신이 없을 때 */
+  CANCELLED: '취소',
 } as const
 export type ExplanationStatus = (typeof ExplanationStatus)[keyof typeof ExplanationStatus]
 
