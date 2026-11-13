@@ -22,6 +22,10 @@ DECISION_TO_STATUS = {
 }
 
 
+# 정정 신고로 판정 단위가 바뀌어 더는 결정할 수 없는 승인 요청의 decision 값(20).
+CANCELLED_REQUEST = "취소"
+
+
 class InsufficientAuthorityError(Exception):
     """결정하는 역할이 요구 역할보다 낮다(API 403)."""
 
@@ -71,6 +75,12 @@ def decide_approval(
     request = session.get(ApprovalRequest, request_id)
     if request is None:
         raise LookupError(f"승인 요청 {request_id} 이(가) 없습니다")
+    # 취소된 요청은 포함 건이 떨어져 나가 있어 상태 머신이 막지 못한다(건이 없으니 전이도 없다).
+    # 승인 · 반려로 이미 결정된 요청은 지금처럼 상태 머신이 막는다.
+    if request.decision == CANCELLED_REQUEST:
+        raise InvalidTransitionError(
+            f"정정 신고로 취소된 승인 요청입니다: {request.reason} (요청 {request_id})"
+        )
     # 권한이 없으면 아무것도 바꾸지 않고 끝나야 하므로 전이보다 앞에서 본다.
     if not has_authority(role, request.approver_role):
         raise InsufficientAuthorityError(
