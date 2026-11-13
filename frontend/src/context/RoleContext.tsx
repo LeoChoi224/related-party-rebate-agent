@@ -16,7 +16,7 @@ export const ROLE_PROFILES = [
     role: '영업지원팀',
     actor: '김지원',
     home: '/',
-    inbox: [ClaimStatus.AWAITING_SUPPORT],
+    inbox: [ClaimStatus.AWAITING_SUPPORT, ClaimStatus.OFFSET_REVIEW],
     dept: Department.SALES_SUPPORT,
   },
   {

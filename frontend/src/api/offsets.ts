@@ -1,10 +1,20 @@
 /**
- * 상계 API [가정]: AI 상계액 추천, 재무 결정, 대리점 동의 [모의].
+ * 상계 API [가정]: 영업 의견, AI 상계액 추천, 재무 결정, 대리점 동의 [모의].
  * 제안은 그룹 건이 승인될 때 서버가 만들고, 조회는 건 상세의 offsets 칸으로 한다.
  */
 import type { AgencyConsent } from '../types/enums.ts'
-import type { OffsetDecisionBody, OffsetProposal, OffsetResult } from '../types/offset.ts'
+import type {
+  OffsetDecisionBody,
+  OffsetProposal,
+  OffsetResult,
+  SalesOpinionBody,
+} from '../types/offset.ts'
 import { api } from './client.ts'
+
+/** 영업이 대리점 관계 부담을 보고 대안을 낸다. 영업 아님 403, 재무 결정 뒤 409, 금액 오류 422. */
+export function sendSalesOpinion(offsetId: number, body: SalesOpinionBody): Promise<OffsetProposal> {
+  return api.post<OffsetProposal>(`/offsets/${offsetId}/sales-opinion`, body)
+}
 
 /** AI 상계액 추천을 받는다. LLM 을 부르므로 몇 초 걸릴 수 있다. 재무 결정 뒤면 409. */
 export function recommendOffset(offsetId: number): Promise<OffsetProposal> {
