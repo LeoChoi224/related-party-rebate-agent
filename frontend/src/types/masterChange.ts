@@ -72,3 +72,47 @@ export type RejudgeResult = {
   group_sum_krw: number | null
   approval_request_id: number | null
 }
+
+/** 신고 문장 한 건과 AI 해석 [주장] · 영업지원팀 확인(19). 해석 전 · 대체 모드면 ai_* 가 null */
+export type MasterChangeReport = {
+  report_id: number
+  raw_text: string
+  provenance: string
+  reported_by: string
+  status: '확인대기' | '적용' | '기각'
+  ai_agency_id: string | null
+  ai_attr_type: CorrectableAttr | null
+  ai_new_value: string | null
+  ai_effective_date: string | null
+  ai_confidence: number | null
+  /** 가드가 찾은 문제 · 대체 모드 이유 */
+  problems: string[]
+  verified: boolean
+  fallback_used: boolean
+  model: string | null
+  change_id: number | null
+  decision_reason: string | null
+  decided_by: string | null
+  decided_at: string | null
+  /** AI 해석과 같은 값으로 적용했는지. 기각 · 대체 모드면 null */
+  agreed: boolean | null
+  created_at: string
+}
+
+/** 영업지원팀 확인. 적용이면 대리점 · 속성 · 새 값, 기각이면 사유가 필요하다(서버 422). */
+export type ReportDecisionBody = {
+  apply: boolean
+  agency_id: string
+  attr_type: CorrectableAttr | null
+  new_value: string
+  effective_date: string | null
+  reason: string
+  actor: string
+  role: string
+}
+
+export type ReportDecisionResult = {
+  report: MasterChangeReport
+  /** 적용이면 정정 적용 결과, 기각이면 null */
+  result: MasterChangeResult | null
+}

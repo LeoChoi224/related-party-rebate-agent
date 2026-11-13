@@ -2,11 +2,17 @@
  * 마스터 정정 신고 페이지.
  * 대리점이 신고한 대표자 · 주소 · 등록계좌 정정을 적용하고, 관련자 그룹이 어떻게 바뀌었는지(또는 유지되었는지),
  * 그 근거 행, 다시 판정된 건을 보여 준다. 서버가 돌려준 값을 그대로 보여 주고 판정을 다시 계산하지 않는다.
- * 신고 문장을 AI 가 해석하는 master_change_parser(19)는 이 폼의 앞단이 된다.
+ * 신고 문장을 AI 가 해석하는 master_change_parser(19)가 이 폼의 앞단이다: 해석 [주장] 이 폼을 채우고,
+ * 영업지원팀이 확인 · 수정해 적용하거나 기각한다. AI 해석과 다른 값으로 적용하면 사유가 필요하다(서버 422).
  */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { applyMasterChange, listMasterChanges } from '../api/agencies.ts'
+import {
+  applyMasterChange,
+  createMasterChangeReport,
+  decideMasterChangeReport,
+  listMasterChanges,
+} from '../api/agencies.ts'
 import { ApiError } from '../api/client.ts'
 import EvidenceTable from '../components/EvidenceTable.tsx'
 import ProvenanceBadge from '../components/ProvenanceBadge.tsx'
@@ -17,6 +23,7 @@ import {
   type CorrectableAttr,
   type GroupItem,
   type MasterChangeItem,
+  type MasterChangeReport,
   type MasterChangeResult,
 } from '../types/masterChange.ts'
 import { MASTER_CHANGE_DEMOS } from '../utils/demoEvents.ts'
@@ -29,6 +36,10 @@ export default function MasterChangePage() {
   const [newValue, setNewValue] = useState('')
   const [effectiveDate, setEffectiveDate] = useState('')
   const [reportedText, setReportedText] = useState('')
+  // 신고 문장 AI 해석(19). report 가 있으면 폼 적용은 이 신고의 확인으로 보낸다.
+  const [sentence, setSentence] = useState('')
+  const [report, setReport] = useState<MasterChangeReport | null>(null)
+  const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<MasterChangeResult | null>(null)
@@ -50,25 +61,83 @@ export default function MasterChangePage() {
     }
   }, [reloadKey])
 
-  async function submit() {
+  /** 요청 하나를 보내고, 실패하면 서버 문장을 남긴다. */
+  async function run(action: () => Promise<void>) {
     setBusy(true)
     setError(null)
     try {
-      const applied = await applyMasterChange(agencyId.trim(), {
-        attr_type: attrType,
-        new_value: newValue,
-        effective_date: effectiveDate === '' ? null : effectiveDate,
-        reported_text: reportedText,
-        actor,
-        role,
-      })
-      setResult(applied)
-      setReloadKey((key) => key + 1)
+      await action()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : `요청을 보내지 못했습니다: ${String(e)}`)
     } finally {
       setBusy(false)
     }
+  }
+
+  /** 신고 문장을 AI 가 해석하고, 해석 [주장] 으로 폼을 채운다. 대체 모드면 폼은 사람이 채운다. */
+  function parseSentence() {
+    void run(async () => {
+      const parsed = await createMasterChangeReport(sentence, actor, role)
+      setReport(parsed)
+      setResult(null)
+      setReason('')
+      setReportedText(parsed.raw_text)
+      if (parsed.verified) {
+        setAgencyId(parsed.ai_agency_id ?? '')
+        setAttrType(parsed.ai_attr_type ?? '주소')
+        setNewValue(parsed.ai_new_value ?? '')
+        setEffectiveDate(parsed.ai_effective_date ?? '')
+      }
+    })
+  }
+
+  /** 해석한 신고가 있으면 그 신고의 확인으로, 없으면 폼 값 그대로 정정을 적용한다(20). */
+  function submit() {
+    void run(async () => {
+      const fields = {
+        new_value: newValue,
+        effective_date: effectiveDate === '' ? null : effectiveDate,
+        actor,
+        role,
+      }
+      if (report !== null) {
+        const decided = await decideMasterChangeReport(report.report_id, {
+          apply: true,
+          agency_id: agencyId.trim(),
+          attr_type: attrType,
+          reason,
+          ...fields,
+        })
+        setReport(decided.report)
+        setResult(decided.result)
+      } else {
+        setResult(
+          await applyMasterChange(agencyId.trim(), {
+            attr_type: attrType,
+            reported_text: reportedText,
+            ...fields,
+          }),
+        )
+      }
+      setReloadKey((key) => key + 1)
+    })
+  }
+
+  function dismiss() {
+    if (report === null) return
+    void run(async () => {
+      const decided = await decideMasterChangeReport(report.report_id, {
+        apply: false,
+        agency_id: '',
+        attr_type: null,
+        new_value: '',
+        effective_date: null,
+        reason,
+        actor,
+        role,
+      })
+      setReport(decided.report)
+    })
   }
 
   return (
@@ -80,6 +149,29 @@ export default function MasterChangePage() {
       </p>
 
       <div className="decision-form">
+        <h3>
+          신고 문장으로 입력 — AI 해석 <ProvenanceBadge provenance="주장" />
+        </h3>
+        <label>
+          신고 문장(대리점이 보낸 그대로)
+          <textarea value={sentence} onChange={(event) => setSentence(event.target.value)} />
+        </label>
+        <div className="actions">
+          {MASTER_CHANGE_DEMOS.map((demo) => (
+            <button key={demo.label} type="button" disabled={busy} onClick={() => setSentence(demo.sentence)}>
+              {demo.label} 문장
+            </button>
+          ))}
+          <button type="button" disabled={busy || sentence.trim() === ''} onClick={parseSentence}>
+            AI 해석
+          </button>
+          <span className="muted">LLM 을 부르므로 몇 초 걸릴 수 있습니다. 해석이 아래 폼을 채웁니다.</span>
+        </div>
+        {report !== null && <ReportView report={report} />}
+      </div>
+
+      <div className="decision-form">
+        <h3>{report === null ? '직접 입력' : `신고 #${report.report_id} 확인 — 값을 확인 · 수정해 적용`}</h3>
         <div className="actions">
           {MASTER_CHANGE_DEMOS.map((demo) => (
             <button
@@ -124,10 +216,33 @@ export default function MasterChangePage() {
           신고 원문(선택)
           <textarea value={reportedText} onChange={(event) => setReportedText(event.target.value)} />
         </label>
+        {report !== null && report.status === '확인대기' && (
+          <label>
+            사유(기각 · AI 해석과 다른 값으로 적용하면 필수)
+            <textarea value={reason} onChange={(event) => setReason(event.target.value)} />
+          </label>
+        )}
         <div className="actions">
-          <button type="button" disabled={busy} onClick={submit}>
+          <button type="button" disabled={busy || (report !== null && report.status !== '확인대기')} onClick={submit}>
             정정 적용
           </button>
+          {report !== null && report.status === '확인대기' && (
+            <button type="button" className="danger" disabled={busy} onClick={dismiss}>
+              신고 기각
+            </button>
+          )}
+          {report !== null && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setReport(null)
+                setReason('')
+              }}
+            >
+              해석 없이 직접 입력
+            </button>
+          )}
         </div>
         {error !== null && <p className="error">{error}</p>}
       </div>
@@ -272,5 +387,44 @@ function ResultView({ result }: { result: MasterChangeResult }) {
         </div>
       )}
     </section>
+  )
+}
+
+function ReportView({ report }: { report: MasterChangeReport }) {
+  return (
+    <div className="next-action">
+      <p>
+        신고 #{report.report_id} <span className="badge badge-wait">{report.status}</span>{' '}
+        <span className="muted">— {report.raw_text}</span>
+      </p>
+      {report.verified ? (
+        <dl className="facts">
+          <dt>AI 해석</dt>
+          <dd>
+            <strong>
+              {report.ai_agency_id} {report.ai_attr_type} → {report.ai_new_value}
+            </strong>
+            {report.ai_effective_date !== null && ` (정정일 ${report.ai_effective_date})`}{' '}
+            <ProvenanceBadge provenance="주장" />
+          </dd>
+          <dt>확신도</dt>
+          <dd>{report.ai_confidence === null ? '—' : `${Math.round(report.ai_confidence * 100)}%`}</dd>
+          <dt>모델</dt>
+          <dd>{report.model ?? '—'}</dd>
+        </dl>
+      ) : (
+        <p className="muted">
+          <span className="badge badge-neutral">대체 모드</span> AI 해석 없이 아래 폼에 직접 입력하세요.
+          {report.problems.length > 0 && ` 이유: ${report.problems.join(' / ')}`}
+        </p>
+      )}
+      {report.status !== '확인대기' && (
+        <p className="muted">
+          영업지원팀 확인 <strong>{report.status}</strong> ({report.decided_by})
+          {report.decision_reason !== null && ` — ${report.decision_reason}`}
+          {report.agreed !== null && ` · AI 해석과 ${report.agreed ? '같은 값' : '다른 값'}으로 적용`}
+        </p>
+      )}
+    </div>
   )
 }
