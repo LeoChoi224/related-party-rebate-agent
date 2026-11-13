@@ -1,4 +1,4 @@
-"""결정 요청 · 결과.
+"""결정 요청 · 결과, 건 상세에 싣는 승인 요청 요약.
 
 결정자 이름 · 역할은 시연용으로 본문에 담는다(실제 시스템이면 로그인 토큰에서 꺼낸다).
 역할은 문자열로 받는다. 결재권자가 아닌 역할(재무 등)은 형식 오류(422)가 아니라
@@ -8,6 +8,7 @@
 from pydantic import BaseModel, Field, model_validator
 
 from app.models.enums import Decision
+from app.schemas.common import UtcDatetime
 
 
 class DecisionRequest(BaseModel):
@@ -34,3 +35,19 @@ class ApprovalDecisionResult(BaseModel):
 class ClaimDecisionResult(BaseModel):
     rebate_id: str
     status: str
+
+
+class ApprovalSummary(BaseModel):
+    """건 상세의 승인 요청 칸. 결정 전에는 결정 · 사유 · 결정자 · 시각이 비어 있다.
+
+    rebate_ids 는 이 요청을 결정하면 함께 바뀌는 건이다.
+    """
+
+    request_id: int
+    approver_role: str
+    group_sum_krw: int
+    decision: str | None
+    reason: str | None
+    decided_by: str | None
+    decided_at: UtcDatetime | None
+    rebate_ids: list[str]
