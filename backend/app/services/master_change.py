@@ -51,12 +51,11 @@ from app.schemas.related_party import RelationEdgeOut
 from app.services.approval import (
     CANCELLED_REQUEST,
     InsufficientAuthorityError,
-    open_approval_requests,
 )
-from app.services.approval_authority import current_group_of, decide_authority
 from app.services.claim_state import REVIEW_FROM, InvalidTransitionError, transition
 from app.services.explanation import OPEN_STATUSES
-from app.services.intake import NEXT_STATUS, SYSTEM_ACTOR
+from app.services.intake import SYSTEM_ACTOR
+from app.services.rejudge import latest_request_id, rejudge_claims
 from app.services.related_party import find_related_parties, save_group_version
 
 logger = logging.getLogger(__name__)
@@ -273,7 +272,7 @@ def _reopen_claims(
             ),
             payload={"change_id": change.change_id},
         )
-    _rejudge(
+    rejudge_claims(
         session,
         [c for c in claims if before[c.rebate_id][0] in AUTO_REJUDGE],
         actor=actor,
@@ -338,98 +337,6 @@ def _cancel_open_requests(
     session.flush()
 
 
-def latest_request_id(session: Session, rebate_id: str) -> int | None:
-    return session.scalar(
-        select(ApprovalItem.request_id)
-        .where(ApprovalItem.rebate_id == rebate_id)
-        .order_by(ApprovalItem.request_id.desc())
-        .limit(1)
-    )
-
-
-def _rejudge(
-    session: Session,
-    claims: list[RebateClaim],
-    *,
-    actor: str,
-    role: str,
-    reason: str,
-) -> None:
-    """재검토필요 건을 지금 버전 그룹으로 다시 판정해 결재 경로(전결대기 · 상신대기)에 올린다.
-
-    한 달의 합산은 그 달의 모든 건(이미 지급된 건 포함)으로 계산하되, 판정 값은 넘겨받은 건에만 쓴다.
-    다른 건의 판정 당시 값(그룹 · 합산)을 덮어쓰지 않기 위해서다.
-    """
-    for period in sorted({c.period_ym for c in claims}):
-        period_claims = session.scalars(
-            select(RebateClaim).where(RebateClaim.period_ym == period)
-        ).all()
-        decisions = {
-            d.rebate_id: d
-            for d in decide_authority(period_claims, current_group_of(session))
-        }
-        for claim in (c for c in claims if c.period_ym == period):
-            decision = decisions[claim.rebate_id]
-            claim.min_authority = decision.min_authority
-            claim.group_id = decision.group_id
-            claim.group_sum_krw = decision.group_sum_krw
-            transition(
-                session,
-                claim,
-                ClaimStatus.RELATION_CHECKED,
-                actor=actor,
-                actor_role=role,
-                reason=reason,
-                payload={
-                    "group_id": decision.group_id,
-                    "group_sum_krw": decision.group_sum_krw,
-                    "min_authority": decision.min_authority,
-                },
-            )
-            transition(
-                session,
-                claim,
-                NEXT_STATUS[decision.min_authority],
-                actor=actor,
-                actor_role=role,
-                reason=(
-                    f"판정 단위 합산 {decision.group_sum_krw:,}원 → "
-                    f"최소 결재권자 {decision.min_authority}"
-                ),
-            )
-    _attach_or_open_requests(
-        session, [c for c in claims if c.status == ClaimStatus.AWAITING_EXECUTIVE]
-    )
-
-
-def _attach_or_open_requests(session: Session, claims: list[RebateClaim]) -> None:
-    """상신대기가 된 건을 승인 요청에 올린다. 같은 그룹 · 같은 달의 열린 요청이 있으면 거기에 더한다."""
-    fresh = []
-    for claim in claims:
-        request = (
-            session.scalar(
-                select(ApprovalRequest)
-                .where(
-                    ApprovalRequest.group_id == claim.group_id,
-                    ApprovalRequest.period_ym == claim.period_ym,
-                    ApprovalRequest.decision.is_(None),
-                )
-                .limit(1)
-            )
-            if claim.group_id is not None
-            else None
-        )
-        if request is None:
-            fresh.append(claim)
-        else:
-            session.add(
-                ApprovalItem(request_id=request.request_id, rebate_id=claim.rebate_id)
-            )
-    if fresh:
-        open_approval_requests(session, fresh)
-    session.flush()
-
-
 def rejudge_claim(
     session: Session, rebate_id: str, *, actor: str, role: str
 ) -> RebateClaim:
@@ -445,5 +352,7 @@ def rejudge_claim(
         raise InvalidTransitionError(
             f"재판정은 재검토필요 건만 할 수 있습니다: {claim.status} ({rebate_id})"
         )
-    _rejudge(session, [claim], actor=actor, role=role, reason="재검토필요 건 재판정")
+    rejudge_claims(
+        session, [claim], actor=actor, role=role, reason="재검토필요 건 재판정"
+    )
     return claim
