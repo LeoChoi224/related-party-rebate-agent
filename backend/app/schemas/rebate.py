@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from app.schemas.ai_recommendation import AiReviewOut
 from app.schemas.approval import ApprovalSummary
 from app.schemas.event_log import EventLogOut
+from app.schemas.explanation import ExplanationOut
 from app.schemas.payment import PaymentOut
 from app.schemas.related_party import RelationEdgeOut
 
@@ -78,3 +79,5 @@ class ClaimDetail(BaseModel):
     events: list[EventLogOut]
     # 이 건의 검토 단위(상신 건이면 승인 요청)에서 가장 최근 AI 추천 [주장]. 검토 전이면 없음.
     ai_review: AiReviewOut | None
+    # 이 건의 소명 요청들(요청 ID 순). 요청마다 회신 · AI 주장 대조 · 사람 확인이 붙는다.
+    explanations: list[ExplanationOut]
