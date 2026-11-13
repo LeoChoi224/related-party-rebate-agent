@@ -142,7 +142,7 @@ flowchart TD
 - `[[ ]]` 모양은 **interrupt**다. 그래프가 여기서 멈추고, 사람 결정이나 외부 회신이 오면 이어서 실행된다.
 - **건 상태는 사람 결정 뒤에만 바뀐다.** `claim_review` 는 결정 API 가 09 서비스로 권한 · 상태를 검사하고 바꾼 뒤, 통과했을 때만 재개한다. LangGraph 는 재개 값을 받는 순간 저장해서, 재개 뒤 노드가 403 · 409 로 실패하면 다음 재개가 그 틀린 값으로 돌기 때문이다(17 에서 시험으로 확인). 그래서 `record_decision` 은 추천 행에 결정 · 일치 여부만 적는다.
 - AI가 결재 단계를 최소 결재권자보다 낮게 판단하면 `raise_authority`가 코드 값으로 고정하고 불일치를 기록한다.
-- `wait_external` · `apply_reply` 는 22(대리점 동의)에서 더한다. 은행 회신은 11 의 API 로 처리한다.
+- **상계(22)는 그래프를 늘리지 않았다.** 계획은 `claim_review` 뒤에 `wait_external` · `apply_reply` 를 붙이는 것이었지만, ① 검토 단위는 승인 요청(G1 3건)인데 상계 · 대리점 동의 · 지급은 건 단위라 스레드 하나로 재개할 수 없고 ② 재무 결정 · 대리점 동의 [모의] 를 기다리는 것은 업무 상태(상계검토 + 제안 상태)로 DB 에 이미 남아, 체크포인트에 또 두면 상태가 두 곳이 된다. 그래서 AI 상계액 추천은 구조화 출력 한 번 → 가드(0 ~ 코드가 계산한 상계 한도) → 1회 다시 → 대체 모드인 단일 호출(`agents/offset_advisor.py`)이고, 기다림 · 반영은 서비스(`services/offset.py`)가 한다. 은행 회신은 11 의 API 로 처리한다.
 - `explanation_review` 의 대상은 **소명 회신 하나**다(thread_id `explanation_review:explanation_reply:{reply_id}`). 건 상태와 사람 확인 결과는 확인 API 가 서비스(`services/explanation.py`)로 먼저 적고, 통과했을 때만 그래프를 재개한다(`claim_review` 와 같은 이유). 그래서 `record_decision` 노드가 없고, AI 검토를 건너뛴 확인도 기록이 남는다.
 - `check_claim` 은 모델이 도구를 골라 부르는 반복을 직접 돌린다(주장 하나당 최대 4라운드). 도구가 실제로 돌려준 근거 행만 인정하고, 근거 없이 일치 · 불일치를 말하면 코드가 **확인불가로 내린다**. 종합 판단의 증빙 충분은 모든 주장이 일치일 때만 허용하며, 어기면 1회 다시 생성하고 2회 실패하면 대체 모드다.
 - **반려 → 소명 → 재상신(21)**: 반려 결정에 소명 항목을 함께 보내면 반려된 건마다 소명 요청이 생기고 건이 소명대기가 된다(G1 은 대리점마다 회신이 따로 오므로 3건 · 요청 3개). 회신을 등록하는 순간 `explanation_review` 가 돈다(모델이 없으면 대체 모드). 영업지원팀이 증빙 충분으로 확인하면 건은 관계확인을 거쳐 한도 판정 코드가 바로 다시 판정해 전결대기 · 상신대기로 돌아가고(승인 요청은 같은 그룹 · 같은 달에 열린 것이 있으면 합류, 없으면 새로 생김), 이어서 `claim_review` 가 새로 시작되어 AI 추천과 함께 다시 결재된다. 증빙 부족이면 지급보류 + 추가 소명 요청 작업이다.
@@ -163,10 +163,7 @@ flowchart TD
     NS["save_recommendation<br/>AI_RECOMMENDATION 저장"] --> N7
     N7[["human_decision · interrupt<br/>AI 추천과 함께 결정 요청"]]
     N7 -->|"결정 API 가 서비스로 상태 변경 뒤 재개"| N8["record_decision<br/>결정 · 추천 일치 여부 기록"]
-    N8 --> N9{"후속 처리 (22)"}
-    N9 -->|"지급 · 상계"| N10[["wait_external · interrupt<br/>은행 회신 · 대리점 동의"]]
-    N10 --> N11["apply_reply<br/>지급완료 · 상계완료 · 지급보류"]
-    N11 --> END1(["끝"])
+    N8 --> END1(["끝 · 승인 뒤 상계 · 지급은 서비스(22 · 11)"])
   end
 
   subgraph ER["explanation_review · 소명 검토 에이전트"]
@@ -220,8 +217,9 @@ flowchart TD
 - **10 `feat/task-dispatcher` 는 `TASK` 를 더한다.** 작업은 상태 머신의 전이 함수 안에서 규칙표로 자동 생성된다(상태를 바꾸는 길이 하나라 빠지는 작업이 없다). 규칙표 키는 (이전 상태, 이후 상태)이고 이전 상태 조건이 없는 규칙은 "아무거나"다: 승인 → 재무 지급 실행, 소명대기 → 영업지원팀 소명 요청, 소명대기 → 지급보류 → 영업지원팀 추가 소명 요청, 지급지시 → 지급보류 → 재무 지급 계좌 확인, 상계검토 → 재무 상계 검토, 재검토필요 → 영업지원팀 재판정. 결재 대기(전결대기 · 상신대기)는 작업이 아니라 처리함에서 다룬다.
 - 건이 어떤 상태를 떠나면 그 상태(`trigger_status`)가 만든 열린 작업은 자동 완료된다(예: 승인 → 지급지시 이면 지급 실행 작업이 닫힘). 사람은 작업 API 로 열림 → 진행 → 완료를 표시하고, 완료는 다시 열 수 없다. 작업 상태 변경은 이력(`EVENT_LOG`)에 남기지 않는다. 상태 전이가 아닌 작업(접수 때 정황 소명 요청 · 24 의 감사 사후 검토)은 `trigger_status` · `created_by_event` 가 비어 있다. 부서 이름은 역할 이름과 같다.
 - **18 `feat/explanation-review-graph` 는 `EXPLANATION_REQUEST` · `EXPLANATION_REPLY` · `EXPLANATION_CHECK` 를 더한다.** 요청은 반려 · 지급보류 건에만 만들 수 있고(상신대기 G1 건 하나만 소명대기로 빠지면 3건이 한 묶음인 승인 요청과 어긋난다) 건은 소명대기가 된다. 요청 하나에 회신은 하나(`unique`)이고, 보완 회신은 새 요청으로 받는다. AI 판단(증빙 충분 · 부족)은 `AI_RECOMMENDATION`(승인 · 반려 · 소명 먼저)과 의미가 달라 `EXPLANATION_REPLY` 에 직접 두며, 그래서 `rec_id` 는 없다. 사람 확인 결과도 서비스가 같은 행에 적는다. 증빙 충분이면 소명대기 → 관계확인(이어서 21 이 바로 재판정해 결재 경로로 올림), 증빙 부족이면 소명대기 → 지급보류.
-- **20 `feat/master-correction-regroup` 은 `MASTER_CHANGE` 를 더한다.** 정정 가능한 속성은 대표자 · 주소 · 등록계좌뿐이다(실입금계좌는 돈이 들어온 사실이라 신고로 고칠 수 없다). 적용하면 이전 값의 `valid_to` 를 정정일로 닫고 `[주장]` 새 행(`source_ref` = `master_change:번호`)을 더하며, 원본 `AGENCY` 는 고치지 않는다. 그 뒤 모든 식별속성으로 그룹을 새 `GROUP_VERSION` 으로 다시 계산한다. 소속 그룹(구성원 집합)이 바뀐 대리점의 돈이 안 나간 건만 영향을 받아 재검토필요로 돌아가고, 그중 결재 대기였던 건은 한도 판정 코드가 바로 다시 판정해 결재 경로에 올린다. 그룹이 그대로면 영향 건이 없고 근거 쌍만 보여 준다(결론 유지). 열려 있던 승인 요청은 `decision = 취소` 로 표시하고 포함 건을 떼며, 열린 소명 요청도 취소한다.
-- **11 `feat/payment-mock` 은 `PAYMENT_ORDER` · `BANK_REPLY` 를 더한다.** 지급 지시는 재무만(403), 승인 건 또는 마지막 지시가 계좌오류였던 지급보류 건만 된다(409 — 증빙 부족으로 보류된 건이 지급되는 것을 막음). 은행 회신은 시연이 결과를 골라 넣는 API 이고 출처는 `모의`, 지시 하나에 회신 하나(두 번째는 409). 성공 → 지급완료, 계좌오류 → 지급보류(재무 계좌 확인 작업) → 다시 지시하면 새 지시를 만든다. 실제 수취계좌는 원본에 없어(설계안 2장) 지급 계좌 컬럼은 두지 않는다. 금액은 22 전까지 장려금액이다.
+- **20 `feat/master-correction-regroup` 은 `MASTER_CHANGE` 를 더한다.** 정정 가능한 속성은 대표자 · 주소 · 등록계좌뿐이다(실입금계좌는 돈이 들어온 사실이라 신고로 고칠 수 없다). 적용하면 이전 값의 `valid_to` 를 정정일로 닫고 `[주장]` 새 행(`source_ref` = `master_change:번호`)을 더하며, 원본 `AGENCY` 는 고치지 않는다. 그 뒤 모든 식별속성으로 그룹을 새 `GROUP_VERSION` 으로 다시 계산한다. 소속 그룹(구성원 집합)이 바뀐 대리점의 돈이 안 나간 건만 영향을 받아 재검토필요로 돌아가고, 그중 결재 대기였던 건은 한도 판정 코드가 바로 다시 판정해 결재 경로에 올린다. 그룹이 그대로면 영향 건이 없고 근거 쌍만 보여 준다(결론 유지). 열려 있던 승인 요청은 `decision = 취소` 로 표시하고 포함 건을 떼며, 열린 소명 요청 · 상계 제안(22)도 취소한다.
+- **11 `feat/payment-mock` 은 `PAYMENT_ORDER` · `BANK_REPLY` 를 더한다.** 지급 지시는 재무만(403), 승인 건 또는 마지막 지시가 계좌오류였던 지급보류 건만 된다(409 — 증빙 부족으로 보류된 건이 지급되는 것을 막음). 은행 회신은 시연이 결과를 골라 넣는 API 이고 출처는 `모의`, 지시 하나에 회신 하나(두 번째는 409). 성공 → 지급완료, 계좌오류 → 지급보류(재무 계좌 확인 작업) → 다시 지시하면 새 지시를 만든다. 실제 수취계좌는 원본에 없어(설계안 2장) 지급 계좌 컬럼은 두지 않는다. 금액은 장려금액에서 확정된 상계액을 뺀 남은 금액이다(22).
+- **22 `feat/ext-ar-offset` 은 `OFFSET_PROPOSAL` · `AR_ADJUSTMENT` 를 더한다 [가정].** 관련자 그룹 건이 승인되면(결정 API 와 같은 트랜잭션) 그룹 구성원의 90일 초과 연체 채권 잔액을 보고, 남은 잔액이 있으면 건마다 제안 1개를 만들어 승인 → 상계검토로 보낸다(재무 상계 검토 작업). 상계 한도 `max_offset_krw` = min(지급할 남은 금액, 그룹 연체 잔액 − 같은 그룹 열린 제안이 잡은 몫)이고 코드가 계산한다. 단독 대리점의 연체는 재무 일반 회수 업무로 보고 대상에서 뺐다. 제안 상태: 재무검토 → 동의대기(재무가 1 ~ 한도에서 상계액 결정) → 상계확정(대리점 동의 [모의]) · 재무반려(상계하지 않음) · 동의거절 · 취소(정정 신고). 상계확정이면 상계액을 이 건 대리점 채권 먼저 · 오래된 것 먼저 나눠 `AR_ADJUSTMENT`(출처 `가정`)에 남기고(원본 `outstanding_krw` 는 그대로, 지금 잔액 = 원본 − 조정 합계), 전액이면 상계검토 → 상계완료, 일부면 상계검토에 남아 재무가 차액을 지급 지시한다. 재무반려 · 동의거절이면 전액 지급 지시. 결정 · 동의 전 상계검토 건의 지급 지시는 409. AI 추천 상계액은 `AI_RECOMMENDATION` 과 뜻이 달라(18 과 같은 이유) 제안 행에 직접 두므로 `rec_id` 는 없고, 단일 `ar_id` 대신 `group_id` 로 대상 채권을 찾는다. 영업 의견(`sales_opinion`)은 23 에서 더한다. 제안 상태 변화는 `EVENT_LOG`(`entity_type` = `offset_proposal`)에 남는다.
 
 ```mermaid
 erDiagram
@@ -389,13 +387,27 @@ erDiagram
   OFFSET_PROPOSAL {
     int offset_id PK
     string rebate_id FK
-    string ar_id FK
-    int offset_amount_krw
-    int rec_id FK "AI 추천 상계액"
-    string sales_opinion
-    string finance_decision
-    string agency_consent "모의"
-    string status
+    int group_id FK "판정 당시 그룹 · 이 그룹 연체 채권이 대상"
+    int overdue_total_krw "제안 당시 그룹 연체 잔액"
+    int max_offset_krw "상계 한도 · 코드 계산"
+    string status "재무검토 동의대기 상계확정 재무반려 동의거절 취소"
+    int ai_amount_krw "AI 추천 상계액 · 주장"
+    json ai_rationale
+    json ai_counter_evidence
+    float ai_confidence
+    bool verified
+    bool fallback_used
+    string model
+    string finance_decision "승인 반려"
+    int offset_amount_krw "재무가 정한 상계액"
+    string finance_reason
+    string decided_by
+    datetime decided_at
+    bool agreed "AI 추천과 같은가"
+    string agency_consent "동의 거절"
+    string consent_provenance "모의"
+    datetime consented_at
+    datetime created_at
   }
   PAYMENT_ORDER {
     int payment_id PK
@@ -481,14 +493,13 @@ erDiagram
   EXPLANATION_REQUEST ||--o| EXPLANATION_REPLY : "회신"
   EXPLANATION_REPLY ||--o{ EXPLANATION_CHECK : "주장 대조"
   REBATE_CLAIM ||--o{ OFFSET_PROPOSAL : "상계 제안"
-  AR_ITEM ||--o{ OFFSET_PROPOSAL : "상계 대상"
+  RELATED_GROUP ||--o{ OFFSET_PROPOSAL : "상계 대상 그룹"
   OFFSET_PROPOSAL ||--o{ AR_ADJUSTMENT : "잔액 조정"
   AR_ITEM ||--o{ AR_ADJUSTMENT : "조정됨"
   REBATE_CLAIM ||--o{ PAYMENT_ORDER : "지급 지시"
   PAYMENT_ORDER ||--o{ BANK_REPLY : "은행 회신"
   REBATE_CLAIM ||--o{ AI_RECOMMENDATION : "검토 이력"
   AI_RECOMMENDATION ||--o| APPROVAL_REQUEST : "상신 근거"
-  AI_RECOMMENDATION ||--o| OFFSET_PROPOSAL : "상계 추천"
   EVENT_LOG ||--o{ TASK : "작업 생성"
 ```
 
