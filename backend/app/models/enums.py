@@ -113,3 +113,26 @@ class Recommendation(StrEnum):
     APPROVE = "승인"
     REJECT = "반려"
     EXPLAIN_FIRST = "소명 먼저"
+
+
+class ExplanationStatus(StrEnum):
+    """소명 요청 한 건의 진행 상태. 요청 하나에 회신은 하나다."""
+
+    AWAITING_REPLY = "회신대기"
+    REPLIED = "회신됨"
+    CONFIRMED = "확인완료"
+
+
+class CheckVerdict(StrEnum):
+    """회신 속 주장 하나를 데이터와 대조한 결과. 건(claim)과 헷갈리지 않게 Check 로 쓴다."""
+
+    CONSISTENT = "일치"
+    INCONSISTENT = "불일치"
+    UNVERIFIABLE = "확인불가"
+
+
+class ExplanationJudgement(StrEnum):
+    """소명이 충분한지의 판단. AI 판단과 영업지원팀 확인 결과가 같은 값을 쓴다."""
+
+    SUFFICIENT = "증빙 충분"
+    INSUFFICIENT = "증빙 부족"

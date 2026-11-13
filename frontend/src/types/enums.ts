@@ -84,3 +84,26 @@ export const Recommendation = {
   EXPLAIN_FIRST: '소명 먼저',
 } as const
 export type Recommendation = (typeof Recommendation)[keyof typeof Recommendation]
+
+/** 소명 요청 한 건의 진행 상태. 요청 하나에 회신은 하나다. */
+export const ExplanationStatus = {
+  AWAITING_REPLY: '회신대기',
+  REPLIED: '회신됨',
+  CONFIRMED: '확인완료',
+} as const
+export type ExplanationStatus = (typeof ExplanationStatus)[keyof typeof ExplanationStatus]
+
+/** 회신 속 주장 하나를 데이터와 대조한 결과 */
+export const CheckVerdict = {
+  CONSISTENT: '일치',
+  INCONSISTENT: '불일치',
+  UNVERIFIABLE: '확인불가',
+} as const
+export type CheckVerdict = (typeof CheckVerdict)[keyof typeof CheckVerdict]
+
+/** 소명이 충분한지의 판단. AI 판단과 영업지원팀 확인이 같은 값을 쓴다. */
+export const ExplanationJudgement = {
+  SUFFICIENT: '증빙 충분',
+  INSUFFICIENT: '증빙 부족',
+} as const
+export type ExplanationJudgement = (typeof ExplanationJudgement)[keyof typeof ExplanationJudgement]

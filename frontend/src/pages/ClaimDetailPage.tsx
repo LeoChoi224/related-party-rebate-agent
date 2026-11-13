@@ -14,6 +14,7 @@ import { sendBankReply } from '../api/payments.ts'
 import AuthorityNotice from '../components/AuthorityNotice.tsx'
 import DecisionForm from '../components/DecisionForm.tsx'
 import EventTimeline from '../components/EventTimeline.tsx'
+import ExplanationSection from '../components/ExplanationSection.tsx'
 import EvidenceTable from '../components/EvidenceTable.tsx'
 import ProvenanceBadge from '../components/ProvenanceBadge.tsx'
 import StatusBadge from '../components/StatusBadge.tsx'
@@ -108,6 +109,8 @@ function ClaimDetailView({ rebateId }: { rebateId: string }) {
           <p className="muted">AI 검토 기록 없음</p>
         )}
       </section>
+
+      <ExplanationSection detail={detail} onChanged={() => setReloadKey((key) => key + 1)} />
 
       <section className="detail-section">
         <h3>

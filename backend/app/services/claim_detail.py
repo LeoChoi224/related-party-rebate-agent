@@ -30,6 +30,7 @@ from app.schemas.payment import PaymentOut
 from app.schemas.rebate import ClaimDetail, ClaimUnitMember
 from app.schemas.related_party import RelationEdgeOut
 from app.services.approval_authority import REBATE_LIMIT_KRW
+from app.services.explanation import list_explanations
 
 # AI 검토 단위의 종류. EventLog · Task 의 대상 종류와 같은 표 이름 표기다.
 TARGET_CLAIM = "rebate_claim"
@@ -88,6 +89,7 @@ def get_claim_detail(session: Session, rebate_id: str) -> ClaimDetail:
         payments=_payments(session, rebate_id),
         events=_events(session, rebate_id),
         ai_review=_ai_review(session, rebate_id),
+        explanations=list_explanations(session, rebate_id),
     )
 
 

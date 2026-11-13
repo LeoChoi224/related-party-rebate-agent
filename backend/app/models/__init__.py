@@ -9,6 +9,11 @@ from app.models.ai_recommendation import AIRecommendation
 from app.models.approval import ApprovalItem, ApprovalRequest
 from app.models.base import Base
 from app.models.event_log import EventLog
+from app.models.explanation import (
+    ExplanationCheck,
+    ExplanationReply,
+    ExplanationRequest,
+)
 from app.models.payment import BankReply, PaymentOrder
 from app.models.rebate import RebateClaim
 from app.models.receivable import ARItem
@@ -30,6 +35,9 @@ __all__ = [
     "Base",
     "Deposit",
     "EventLog",
+    "ExplanationCheck",
+    "ExplanationReply",
+    "ExplanationRequest",
     "GroupMember",
     "GroupVersion",
     "IdentityAttribute",

@@ -26,3 +26,25 @@ class ClaimReviewState(TypedDict, total=False):
     # 저장한 추천 행과 사람 결정({"decision", "reason", "actor"})
     rec_id: int
     decision: dict[str, str]
+
+
+class ExplanationReviewState(TypedDict, total=False):
+    # 대상: 검토할 소명 회신과 그 회신이 속한 건 · 대리점
+    reply_id: int
+    rebate_id: str
+    agency_id: str
+    facts: dict[str, Any]
+    llm_available: bool
+    # 회신에서 뽑은 주장과 대조 진행. cursor 는 다음에 대조할 주장 번호(0부터).
+    claims: list[str]
+    extract_failed: bool
+    cursor: int
+    # 주장별 대조 결과: {"seq", "claim_text", "verdict", "finding", "tool_used", "evidence_ref"}
+    checks: list[dict[str, Any]]
+    # 종합 판단(ExplanationAssessment.model_dump()), 대체 모드면 None
+    attempts: int
+    assessment: dict[str, Any] | None
+    problems: list[str]
+    fallback_used: bool
+    # 사람 확인({"judgement", "reason", "actor"})
+    decision: dict[str, str]

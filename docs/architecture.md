@@ -143,6 +143,8 @@ flowchart TD
 - **건 상태는 사람 결정 뒤에만 바뀐다.** `claim_review` 는 결정 API 가 09 서비스로 권한 · 상태를 검사하고 바꾼 뒤, 통과했을 때만 재개한다. LangGraph 는 재개 값을 받는 순간 저장해서, 재개 뒤 노드가 403 · 409 로 실패하면 다음 재개가 그 틀린 값으로 돌기 때문이다(17 에서 시험으로 확인). 그래서 `record_decision` 은 추천 행에 결정 · 일치 여부만 적는다.
 - AI가 결재 단계를 최소 결재권자보다 낮게 판단하면 `raise_authority`가 코드 값으로 고정하고 불일치를 기록한다.
 - `wait_external` · `apply_reply` 는 22(대리점 동의)에서 더한다. 은행 회신은 11 의 API 로 처리한다.
+- `explanation_review` 의 대상은 **소명 회신 하나**다(thread_id `explanation_review:explanation_reply:{reply_id}`). 건 상태와 사람 확인 결과는 확인 API 가 서비스(`services/explanation.py`)로 먼저 적고, 통과했을 때만 그래프를 재개한다(`claim_review` 와 같은 이유). 그래서 `record_decision` 노드가 없고, AI 검토를 건너뛴 확인도 기록이 남는다.
+- `check_claim` 은 모델이 도구를 골라 부르는 반복을 직접 돌린다(주장 하나당 최대 4라운드). 도구가 실제로 돌려준 근거 행만 인정하고, 근거 없이 일치 · 불일치를 말하면 코드가 **확인불가로 내린다**. 종합 판단의 증빙 충분은 모든 주장이 일치일 때만 허용하며, 어기면 1회 다시 생성하고 2회 실패하면 대체 모드다.
 
 ```mermaid
 flowchart TD
@@ -168,13 +170,18 @@ flowchart TD
 
   subgraph ER["explanation_review · 소명 검토 에이전트"]
     E0(["소명 회신 도착 [모의]"]) --> E1["extract_claims · AI<br/>회신 속 주장 목록"]
-    E1 --> E2["check_claim · AI + 도구<br/>주장마다 데이터 조회 · 대조"]
+    E1 -->|"모델 없음 · 추출 실패"| E7["fallback<br/>AI 판단 없이 회신 원문만"]
+    E1 --> E2["check_claim · AI + 도구<br/>주장 하나씩 조회 · 대조<br/>근거 행은 도구 결과에 있는 것만 인정"]
     E2 -->|"남은 주장 있음"| E2
-    E2 --> E3["assess · AI<br/>타당성 · 부족한 증빙 · 추가 요청문"]
-    E3 --> E4{"verify · 가드"}
-    E4 -->|"통과 · 2회 실패 시 대체 모드"| E5[["human_decision · interrupt<br/>영업지원팀 확인"]]
-    E5 -->|"증빙 충분"| S1
-    E5 -->|"증빙 부족"| E6["apply_hold<br/>지급보류 · 추가 요청 작업"]
+    E2 --> E3["assess · AI<br/>증빙 충분 · 부족 · 부족한 증빙 · 추가 요청문"]
+    E3 --> E4{"verify · 가드<br/>충분은 모든 주장이 일치일 때만"}
+    E4 -->|"문제 · 1회차"| E3
+    E4 -->|"2회 실패 · 모델 없음"| E7
+    E4 -->|통과| E8["save_review<br/>AI 판단 · 주장별 결과 저장"]
+    E7 --> E8
+    E8 --> E5[["human_decision · interrupt<br/>영업지원팀 확인"]]
+    E5 -->|"증빙 충분 · 소명대기 → 관계확인"| S1
+    E5 -->|"증빙 부족 · 소명대기 → 지급보류"| E6["추가 소명 요청 작업"]
   end
 
   subgraph MC["master_change_parser · 정정 신고 해석"]
@@ -211,6 +218,7 @@ flowchart TD
 - 결재 권한: 결정하는 역할이 요구 역할(요청의 `approver_role`, 전결 건은 `min_authority`) **이상** 이어야 한다(`ApproverRole` 순서로 비교, 결재권자가 아닌 역할은 항상 부족 → 403). 반려는 사유 필수(422). 이미 결정된 요청 · 건은 상태 머신이 막는다(409). 상신대기 건은 전결 결정 길로 결정할 수 없다(요청 기록 없이 승인되는 것을 막음). 결정자 이름 · 역할은 시연용으로 요청 본문에 담는다(실제 시스템이면 로그인 토큰에서 꺼낸다).
 - **10 `feat/task-dispatcher` 는 `TASK` 를 더한다.** 작업은 상태 머신의 전이 함수 안에서 규칙표로 자동 생성된다(상태를 바꾸는 길이 하나라 빠지는 작업이 없다). 규칙표 키는 (이전 상태, 이후 상태)이고 이전 상태 조건이 없는 규칙은 "아무거나"다: 승인 → 재무 지급 실행, 소명대기 → 영업지원팀 소명 요청, 소명대기 → 지급보류 → 영업지원팀 추가 소명 요청, 지급지시 → 지급보류 → 재무 지급 계좌 확인, 상계검토 → 재무 상계 검토, 재검토필요 → 영업지원팀 재판정. 결재 대기(전결대기 · 상신대기)는 작업이 아니라 처리함에서 다룬다.
 - 건이 어떤 상태를 떠나면 그 상태(`trigger_status`)가 만든 열린 작업은 자동 완료된다(예: 승인 → 지급지시 이면 지급 실행 작업이 닫힘). 사람은 작업 API 로 열림 → 진행 → 완료를 표시하고, 완료는 다시 열 수 없다. 작업 상태 변경은 이력(`EVENT_LOG`)에 남기지 않는다. 상태 전이가 아닌 작업(접수 때 정황 소명 요청 · 24 의 감사 사후 검토)은 `trigger_status` · `created_by_event` 가 비어 있다. 부서 이름은 역할 이름과 같다.
+- **18 `feat/explanation-review-graph` 는 `EXPLANATION_REQUEST` · `EXPLANATION_REPLY` · `EXPLANATION_CHECK` 를 더한다.** 요청은 반려 · 지급보류 건에만 만들 수 있고(상신대기 G1 건 하나만 소명대기로 빠지면 3건이 한 묶음인 승인 요청과 어긋난다) 건은 소명대기가 된다. 요청 하나에 회신은 하나(`unique`)이고, 보완 회신은 새 요청으로 받는다. AI 판단(증빙 충분 · 부족)은 `AI_RECOMMENDATION`(승인 · 반려 · 소명 먼저)과 의미가 달라 `EXPLANATION_REPLY` 에 직접 두며, 그래서 `rec_id` 는 없다. 사람 확인 결과도 서비스가 같은 행에 적는다. 증빙 충분이면 소명대기 → 관계확인, 증빙 부족이면 소명대기 → 지급보류.
 - **11 `feat/payment-mock` 은 `PAYMENT_ORDER` · `BANK_REPLY` 를 더한다.** 지급 지시는 재무만(403), 승인 건 또는 마지막 지시가 계좌오류였던 지급보류 건만 된다(409 — 증빙 부족으로 보류된 건이 지급되는 것을 막음). 은행 회신은 시연이 결과를 골라 넣는 API 이고 출처는 `모의`, 지시 하나에 회신 하나(두 번째는 409). 성공 → 지급완료, 계좌오류 → 지급보류(재무 계좌 확인 작업) → 다시 지시하면 새 지시를 만든다. 실제 수취계좌는 원본에 없어(설계안 2장) 지급 계좌 컬럼은 두지 않는다. 금액은 22 전까지 장려금액이다.
 
 ```mermaid
@@ -339,24 +347,39 @@ erDiagram
     int exp_id PK
     string rebate_id FK
     json requested_items
-    string status
+    string status "회신대기 회신됨 확인완료"
+    string requested_by
+    datetime created_at
   }
   EXPLANATION_REPLY {
     int reply_id PK
-    int exp_id FK
+    int exp_id FK "unique · 요청 하나에 회신 하나"
     string raw_text
     string provenance "모의"
-    int rec_id FK "AI 판단"
+    string ai_judgement "증빙 충분 증빙 부족 · 대체 모드면 비어 있음"
+    json ai_rationale
+    json missing_evidence
+    string follow_up_request
+    float ai_confidence
+    bool verified
+    bool fallback_used
+    string model
     string review_result "사람 확인 결과"
+    string review_reason
     string reviewed_by
+    datetime reviewed_at
+    bool agreed "AI 판단과 같은가"
+    datetime created_at
   }
   EXPLANATION_CHECK {
     int check_id PK
     int reply_id FK
+    int seq
     string claim_text "회신 속 주장"
-    string tool_used
-    json evidence_ref "조회한 원본 행"
     string verdict "일치 불일치 확인불가"
+    string finding
+    json tool_used
+    json evidence_ref "도구가 돌려준 원본 행"
   }
   OFFSET_PROPOSAL {
     int offset_id PK
@@ -450,7 +473,7 @@ erDiagram
   APPROVAL_REQUEST ||--|{ APPROVAL_ITEM : "포함 건"
   REBATE_CLAIM ||--o{ APPROVAL_ITEM : "상신됨"
   REBATE_CLAIM ||--o{ EXPLANATION_REQUEST : "소명 요청"
-  EXPLANATION_REQUEST ||--o{ EXPLANATION_REPLY : "회신"
+  EXPLANATION_REQUEST ||--o| EXPLANATION_REPLY : "회신"
   EXPLANATION_REPLY ||--o{ EXPLANATION_CHECK : "주장 대조"
   REBATE_CLAIM ||--o{ OFFSET_PROPOSAL : "상계 제안"
   AR_ITEM ||--o{ OFFSET_PROPOSAL : "상계 대상"
@@ -460,7 +483,6 @@ erDiagram
   PAYMENT_ORDER ||--o{ BANK_REPLY : "은행 회신"
   REBATE_CLAIM ||--o{ AI_RECOMMENDATION : "검토 이력"
   AI_RECOMMENDATION ||--o| APPROVAL_REQUEST : "상신 근거"
-  AI_RECOMMENDATION ||--o| EXPLANATION_REPLY : "소명 판단"
   AI_RECOMMENDATION ||--o| OFFSET_PROPOSAL : "상계 추천"
   EVENT_LOG ||--o{ TASK : "작업 생성"
 ```
