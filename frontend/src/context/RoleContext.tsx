@@ -1,26 +1,40 @@
 /**
  * 현재 역할 컨텍스트.
  * 역할 5개(영업지원팀 · 영업임원 · 재무 · 내부감사 · 시연 관리자)마다
- * 이름 · 첫 화면 · 처리함 기본 필터를 정해 두고,
+ * 이름 · 첫 화면 · 처리함 · 작업 기본 필터를 정해 두고,
  * 지금 역할을 보관 · 전환한다. 고른 역할은 브라우저에 저장해 새로고침해도 유지한다.
  * 역할 · 이름은 각 화면이 결정 · 지급 요청 본문에 넣는다(09). 서버 권한 검사를 대신하지 않는다.
  */
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import { ClaimStatus } from '../types/enums.ts'
+import { ClaimStatus, Department } from '../types/enums.ts'
 
 // 이름은 백엔드 테스트(09 · 11)와 같게 맞춰, 이력의 처리자 이름이 늘 같게 보이게 한다.
 // inbox 는 처리함이 처음 보여 줄 상태(빈 배열 = 전체). 결정 권한이 아니다(서버 403 · 409 가 막는다).
+// dept 는 작업 화면이 처음 보여 줄 부서(null = 전체). 역할 이름으로 찾지 않고 표에 적는다.
 export const ROLE_PROFILES = [
-  { role: '영업지원팀', actor: '김지원', home: '/', inbox: [ClaimStatus.AWAITING_SUPPORT] },
-  { role: '영업임원', actor: '박임원', home: '/', inbox: [ClaimStatus.AWAITING_EXECUTIVE] },
+  {
+    role: '영업지원팀',
+    actor: '김지원',
+    home: '/',
+    inbox: [ClaimStatus.AWAITING_SUPPORT],
+    dept: Department.SALES_SUPPORT,
+  },
+  {
+    role: '영업임원',
+    actor: '박임원',
+    home: '/',
+    inbox: [ClaimStatus.AWAITING_EXECUTIVE],
+    dept: null,
+  },
   {
     role: '재무',
     actor: '이재무',
     home: '/',
     inbox: [ClaimStatus.APPROVED, ClaimStatus.PAYMENT_ORDERED],
+    dept: Department.FINANCE,
   },
-  { role: '내부감사', actor: '최감사', home: '/tasks', inbox: [] },
-  { role: '시연 관리자', actor: '시연관리자', home: '/demo', inbox: [] },
+  { role: '내부감사', actor: '최감사', home: '/tasks', inbox: [], dept: Department.AUDIT },
+  { role: '시연 관리자', actor: '시연관리자', home: '/demo', inbox: [], dept: null },
 ] as const
 
 export type RoleProfile = (typeof ROLE_PROFILES)[number]
@@ -47,6 +61,7 @@ type RoleContextValue = {
   role: ActorRole
   actor: string
   inbox: readonly ClaimStatus[]
+  dept: Department | null
   setRole: (role: ActorRole) => void
 }
 
@@ -69,14 +84,20 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   // React 19 부터 Context 자체를 Provider 로 쓴다(.Provider 불필요).
   return (
     <RoleContext
-      value={{ role: profile.role, actor: profile.actor, inbox: profile.inbox, setRole }}
+      value={{
+        role: profile.role,
+        actor: profile.actor,
+        inbox: profile.inbox,
+        dept: profile.dept,
+        setRole,
+      }}
     >
       {children}
     </RoleContext>
   )
 }
 
-/** 지금 역할 · 이름 · 처리함 기본 필터와 역할 전환 함수. RoleProvider 안에서만 쓸 수 있다. */
+/** 지금 역할 · 이름 · 처리함 · 작업 기본 필터와 역할 전환 함수. RoleProvider 안에서만 쓸 수 있다. */
 export function useRole(): RoleContextValue {
   const value = useContext(RoleContext)
   if (value === null) {
