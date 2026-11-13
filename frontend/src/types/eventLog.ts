@@ -6,6 +6,9 @@ import type { ClaimStatus } from './enums.ts'
 /** 건 상태 전이 한 줄. ts 는 UTC 표시("…Z")가 붙은 ISO 글자다. */
 export type EventLogItem = {
   event_id: number
+  entity_type: string
+  /** 어느 건의 이력인지(장려금 건 ID) */
+  entity_id: string
   ts: string
   actor: string
   actor_role: string

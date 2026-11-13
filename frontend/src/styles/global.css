@@ -1,6 +1,6 @@
 /**
  * 전역 스타일: 색 변수, 기본 글꼴, 레이아웃(상단 + 왼쪽 메뉴 + 가운데), 표 · 버튼 · 오류 기본 모양,
- * 상태 배지 · 처리함 필터, 건 상세 구획 · 출처 배지.
+ * 상태 배지 · 처리함 필터, 건 상세 구획 · 출처 배지, 목록 위 필터 줄.
  */
 :root {
   --bg: #f6f7f9;
@@ -222,4 +222,18 @@ textarea {
 button.danger {
   border-color: var(--danger);
   background: var(--danger);
+}
+
+/* 목록 위 필터 줄: 선택 상자 · 체크 · 입력칸 · 버튼을 가로로 놓는다. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+/* 표 안 작은 버튼 */
+button.small {
+  padding: 2px 8px;
 }

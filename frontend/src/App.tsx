@@ -1,14 +1,16 @@
 /**
  * 최상위 화면: 주소 → 페이지 연결(react-router 선언형 방식).
  * 화면 주소(/claims/RB-00006 등)는 React 가 고르고, 백엔드 main.py 는 없는 주소에 index.html 을 돌려준다.
- * 작업 · 이벤트 이력(15)은 아직 NotReady 자리다. 다 바꾸면 NotReady 를 지운다.
+ * NotReady 는 없는 주소(*)에만 쓴다.
  */
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { RoleProvider } from './context/RoleContext.tsx'
 import AppLayout from './layouts/AppLayout.tsx'
 import ClaimDetailPage from './pages/ClaimDetailPage.tsx'
 import DemoPanelPage from './pages/DemoPanelPage.tsx'
+import EventLogPage from './pages/EventLogPage.tsx'
 import InboxPage from './pages/InboxPage.tsx'
+import TasksPage from './pages/TasksPage.tsx'
 
 /** 아직 만들지 않은 화면 자리. */
 function NotReady({ title, roadmap }: { title: string; roadmap: string }) {
@@ -29,8 +31,8 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index element={<InboxPage />} />
             <Route path="claims/:rebateId" element={<ClaimDetailPage />} />
-            <Route path="tasks" element={<NotReady title="작업 목록" roadmap="15" />} />
-            <Route path="events" element={<NotReady title="이벤트 이력" roadmap="15" />} />
+            <Route path="tasks" element={<TasksPage />} />
+            <Route path="events" element={<EventLogPage />} />
             <Route path="demo" element={<DemoPanelPage />} />
             <Route path="*" element={<NotReady title="없는 화면" roadmap="-" />} />
           </Route>

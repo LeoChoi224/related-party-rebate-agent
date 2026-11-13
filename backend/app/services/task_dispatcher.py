@@ -4,6 +4,7 @@
 services/claim_state.py 의 transition 하나라서, 그 함수가 이 모듈을 부른다.
 건이 어떤 상태를 떠나면 그 상태가 만든 열린 작업은 자동으로 완료한다.
 상태 전이가 아닌 작업: 접수 때 정황 소명 요청(R3, 지급은 막지 않음)과 24 의 감사 사후 검토.
+사람이 손으로 닫을 수 있는 것은 이 작업들뿐이다. 전이 작업은 건을 처리하면 닫힌다.
 
 claim_state 가 이 모듈을 import 하므로, 이 모듈은 claim_state 를 import 하지 않는다(순환 방지).
 """
@@ -140,13 +141,24 @@ def open_circumstantial_tasks(
 
 
 def change_task_status(session: Session, task_id: int, to_status: TaskStatus) -> Task:
-    """사람이 작업을 진행 · 완료로 표시한다. 완료는 다시 열 수 없다."""
+    """사람이 작업을 진행 · 완료로 표시한다.
+
+    완료는 다시 열 수 없고, 상태 전이가 만든 작업은 손으로 닫을 수 없다.
+    """
     task = session.get(Task, task_id)
     if task is None:
         raise LookupError(f"작업 {task_id} 이(가) 없습니다")
     if to_status not in TASK_TRANSITIONS.get(task.status, frozenset()):
         raise InvalidTaskTransitionError(
             f"작업 상태를 바꿀 수 없습니다: {task.status} → {to_status} (작업 {task_id})"
+        )
+    # 전이 작업은 건이 그 상태를 떠날 때 자동으로 닫힌다(on_claim_transition).
+    # 그래서 열려 있다면 건은 아직 그 상태다. 손으로 닫으면 처리 안 된 건이 목록에서 사라진다.
+    if to_status == TaskStatus.DONE and task.trigger_status is not None:
+        raise InvalidTaskTransitionError(
+            f"건 {task.ref_id} 이(가) 아직 {task.trigger_status} 상태라 "
+            f"'{task.task_type}' 작업을 닫을 수 없습니다. "
+            f"건을 처리하면 자동으로 닫힙니다 (작업 {task_id})"
         )
     task.status = to_status
     if to_status == TaskStatus.DONE:

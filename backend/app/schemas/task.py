@@ -1,10 +1,9 @@
 """부서별 작업 응답과 작업 상태 변경 요청."""
 
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import TaskStatus
+from app.schemas.common import UtcDatetime
 
 
 class TaskOut(BaseModel):
@@ -21,8 +20,8 @@ class TaskOut(BaseModel):
     trigger_status: str | None
     detail: str
     created_by_event: int | None
-    created_at: datetime
-    closed_at: datetime | None
+    created_at: UtcDatetime
+    closed_at: UtcDatetime | None
 
 
 class TaskStatusChange(BaseModel):

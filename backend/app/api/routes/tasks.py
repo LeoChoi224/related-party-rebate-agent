@@ -4,7 +4,9 @@
 작업 상태 오류는 이 라우트에서만 나므로 전역 처리기 대신 여기서 409 로 바꾼다.
 """
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
 from app.api.deps import SessionDep
@@ -21,14 +23,18 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 def list_tasks(
     session: SessionDep,
     dept: Department | None = None,
-    status: TaskStatus | None = None,
+    # list 인자는 Query() 가 없으면 요청 본문으로 읽힌다. ?status=열림&status=진행
+    status: Annotated[
+        list[TaskStatus] | None,
+        Query(description="거를 작업 상태(여러 개 가능). 비우면 전체"),
+    ] = None,
 ) -> list[TaskOut]:
     """부서 · 작업 상태로 거른 작업 목록. 값을 비우면 거르지 않는다."""
     query = select(Task).order_by(Task.task_id)
     if dept is not None:
         query = query.where(Task.dept == dept)
-    if status is not None:
-        query = query.where(Task.status == status)
+    if status:
+        query = query.where(Task.status.in_(status))
     return session.scalars(query).all()
 
 
