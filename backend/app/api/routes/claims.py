@@ -1,22 +1,25 @@
 """장려금 건 API.
 
-처리함 목록(13), 건 상세(14), 대상월 접수, 전결 건 결정, 지급 지시(11)가 있다.
+처리함 목록(13), 건 상세(14), 대상월 접수, 전결 건 결정, 지급 지시(11), AI 검토(17)가 있다.
+전결 결정은 09 서비스가 권한 · 상태를 검사하고 바꾼 뒤에만 기다리는 AI 검토를 재개한다.
 권한 부족(403) · 상태 전이 오류(409)는 main.py 의 처리기가 바꾸고, 요청 트랜잭션은 롤백된다.
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from sqlalchemy import select
 
-from app.api.deps import SessionDep
+from app.agents.graphs.claim_review import record_human_decision, start_claim_review
+from app.api.deps import ReviewModelDep, SessionDep
 from app.models import Agency, RebateClaim, RelatedGroup
 from app.models.enums import ClaimStatus
+from app.schemas.ai_recommendation import AiReviewOut
 from app.schemas.approval import ClaimDecisionResult, DecisionRequest
 from app.schemas.payment import PaymentOrderRequest, PaymentOrderResult
 from app.schemas.rebate import ClaimDetail, ClaimListItem, IntakeResult
 from app.services.approval import decide_claim
-from app.services.claim_detail import get_claim_detail
+from app.services.claim_detail import TARGET_CLAIM, get_claim_detail
 from app.services.intake import intake_period
 from app.services.payment import order_payment
 
@@ -106,7 +109,7 @@ def intake(
     },
 )
 def decide(
-    rebate_id: str, body: DecisionRequest, session: SessionDep
+    rebate_id: str, body: DecisionRequest, request: Request, session: SessionDep
 ) -> ClaimDecisionResult:
     """전결대기 건 하나를 승인 또는 반려한다. 반려는 사유가 필요하다."""
     try:
@@ -120,7 +123,37 @@ def decide(
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    # 검사를 통과한 결정만 그래프에 넣는다(403 · 409 면 여기까지 오지 않는다).
+    record_human_decision(
+        session,
+        request.app.state.checkpointer,
+        TARGET_CLAIM,
+        rebate_id,
+        decision=body.decision,
+        reason=body.reason,
+        actor=body.actor,
+    )
     return ClaimDecisionResult(rebate_id=claim.rebate_id, status=claim.status)
+
+
+@router.post(
+    "/{rebate_id}/review",
+    responses={
+        404: {"description": "장려금 건이 없음"},
+        409: {"description": "결정 대기 건이 아니거나, 이미 검토해 결정을 기다림"},
+    },
+)
+def review(
+    rebate_id: str, request: Request, session: SessionDep, model: ReviewModelDep
+) -> AiReviewOut:
+    """AI 검토를 사람 결정 앞까지 돌린다. 상신 건은 승인 요청 단위로 한 번만 검토한다."""
+    try:
+        rec = start_claim_review(
+            session, request.app.state.checkpointer, model, rebate_id
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return AiReviewOut.model_validate(rec)
 
 
 @router.post(

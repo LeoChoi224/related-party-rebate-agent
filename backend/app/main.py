@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import Engine
 
 from app.agents.checkpointer import make_checkpointer
+from app.agents.runner import InvalidRunStateError
 from app.api.router import api_router
 from app.core.config import FRONTEND_DIST
 from app.core.database import engine as default_engine
@@ -45,6 +46,13 @@ def invalid_transition_handler(
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
+def invalid_run_state_handler(
+    request: Request, exc: InvalidRunStateError
+) -> JSONResponse:
+    """이미 검토해 결정을 기다리거나 검토할 결정이 없으면 지금 상태와 충돌한 것이라 409."""
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
 def insufficient_authority_handler(
     request: Request, exc: InsufficientAuthorityError
 ) -> JSONResponse:
@@ -70,6 +78,7 @@ def create_app(
     app.state.checkpointer = make_checkpointer()
     # 전이 오류 409 · 권한 부족 403 은 여러 API 가 함께 내므로 라우트마다 잡지 않고 한 곳에 둔다.
     app.add_exception_handler(InvalidTransitionError, invalid_transition_handler)
+    app.add_exception_handler(InvalidRunStateError, invalid_run_state_handler)
     app.add_exception_handler(
         InsufficientAuthorityError, insufficient_authority_handler
     )

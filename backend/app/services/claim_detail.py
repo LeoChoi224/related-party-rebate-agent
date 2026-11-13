@@ -2,6 +2,7 @@
 
 여러 표에 흩어진 판정 근거(판정 단위 구성 건 · 관련자 일치 쌍), 승인 요청, 지급, 이력을
 한 응답으로 모은다. 읽기만 하고 아무것도 바꾸지 않는다.
+AI 검토 단위(review_unit)도 여기서 정한다. 상세가 그 단위의 추천을 싣고, 그래프(17)가 같은 함수를 쓴다.
 결과 모양을 만드는 것 자체가 일이라, 다른 서비스와 달리 응답 스키마를 바로 돌려준다.
 """
 
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Agency,
+    AIRecommendation,
     ApprovalItem,
     ApprovalRequest,
     BankReply,
@@ -21,12 +23,34 @@ from app.models import (
     RelatedGroup,
     RelationEdge,
 )
+from app.schemas.ai_recommendation import AiReviewOut
 from app.schemas.approval import ApprovalSummary
 from app.schemas.event_log import EventLogOut
 from app.schemas.payment import PaymentOut
 from app.schemas.rebate import ClaimDetail, ClaimUnitMember
 from app.schemas.related_party import RelationEdgeOut
 from app.services.approval_authority import REBATE_LIMIT_KRW
+
+# AI 검토 단위의 종류. EventLog · Task 의 대상 종류와 같은 표 이름 표기다.
+TARGET_CLAIM = "rebate_claim"
+TARGET_REQUEST = "approval_request"
+
+
+def review_unit(session: Session, rebate_id: str) -> tuple[str, str]:
+    """건의 AI 검토 단위. 승인 요청에 들어간 건(상신)이면 그 요청, 아니면 건 하나.
+
+    G1 은 결정 한 번(승인 요청)으로 3건이 함께 바뀌므로 검토도 요청 하나로 한다.
+    """
+    # 21 에서 반려 뒤 재상신하면 요청이 하나 더 생긴다. 가장 최근 요청이 지금 단위다.
+    request_id = session.scalar(
+        select(ApprovalItem.request_id)
+        .where(ApprovalItem.rebate_id == rebate_id)
+        .order_by(ApprovalItem.request_id.desc())
+        .limit(1)
+    )
+    if request_id is not None:
+        return TARGET_REQUEST, str(request_id)
+    return TARGET_CLAIM, rebate_id
 
 
 def get_claim_detail(session: Session, rebate_id: str) -> ClaimDetail:
@@ -63,7 +87,23 @@ def get_claim_detail(session: Session, rebate_id: str) -> ClaimDetail:
         approval=_approval(session, rebate_id),
         payments=_payments(session, rebate_id),
         events=_events(session, rebate_id),
+        ai_review=_ai_review(session, rebate_id),
     )
+
+
+def _ai_review(session: Session, rebate_id: str) -> AiReviewOut | None:
+    """건의 검토 단위에서 가장 최근 AI 추천. 시각은 초 단위로 겹쳐 rec_id 순으로 고른다."""
+    target_type, target_id = review_unit(session, rebate_id)
+    rec = session.scalar(
+        select(AIRecommendation)
+        .where(
+            AIRecommendation.target_type == target_type,
+            AIRecommendation.target_id == target_id,
+        )
+        .order_by(AIRecommendation.rec_id.desc())
+        .limit(1)
+    )
+    return AiReviewOut.model_validate(rec) if rec is not None else None
 
 
 def _unit_claims(session: Session, claim: RebateClaim) -> list[ClaimUnitMember]:

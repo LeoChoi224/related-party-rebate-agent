@@ -105,3 +105,11 @@ class RelationJudgement(StrEnum):
 
     RELATED = "관련자"
     CIRCUMSTANTIAL = "정황"
+
+
+class Recommendation(StrEnum):
+    """AI 가 내는 추천. 사람은 승인 · 반려만 고른다(소명 먼저는 21 전까지 추천으로만 남는다)."""
+
+    APPROVE = "승인"
+    REJECT = "반려"
+    EXPLAIN_FIRST = "소명 먼저"

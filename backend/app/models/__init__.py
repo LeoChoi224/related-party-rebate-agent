@@ -5,6 +5,7 @@ Base.metadata.create_all() 은 import 된 모델만 테이블로 만든다.
 """
 
 from app.models.agency import Agency, Deposit, IdentityAttribute
+from app.models.ai_recommendation import AIRecommendation
 from app.models.approval import ApprovalItem, ApprovalRequest
 from app.models.base import Base
 from app.models.event_log import EventLog
@@ -20,6 +21,7 @@ from app.models.related_party import (
 from app.models.task import Task
 
 __all__ = [
+    "AIRecommendation",
     "ARItem",
     "Agency",
     "ApprovalItem",
