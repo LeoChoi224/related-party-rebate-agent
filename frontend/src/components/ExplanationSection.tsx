@@ -209,7 +209,7 @@ function ReplyView({
       )}
 
       {explanation.status === ExplanationStatus.REPLIED && (
-        <ConfirmForm replyId={reply.reply_id} busy={busy} run={run} />
+        <ConfirmForm replyId={reply.reply_id} aiJudgement={reply.ai_judgement} busy={busy} run={run} />
       )}
       {explanation.status === ExplanationStatus.CONFIRMED && <ConfirmedView reply={reply} />}
     </>
@@ -298,7 +298,12 @@ function ListBlock({ title, items }: { title: string; items: string[] }): ReactN
   )
 }
 
-function ConfirmForm({ replyId, busy, run }: RunProps & { replyId: number }) {
+function ConfirmForm({
+  replyId,
+  aiJudgement,
+  busy,
+  run,
+}: RunProps & { replyId: number; aiJudgement: ExplanationJudgement | null }) {
   const { role, actor } = useRole()
   const [reason, setReason] = useState('')
 
@@ -311,8 +316,13 @@ function ConfirmForm({ replyId, busy, run }: RunProps & { replyId: number }) {
       <h4>
         영업지원팀 확인 <span className="muted">— 지금 역할: {role} · {actor}</span>
       </h4>
+      {aiJudgement !== null && (
+        <p className="muted">
+          AI 판단은 <strong>{aiJudgement}</strong> 입니다. 다르게 확인하면 사유를 입력해야 합니다.
+        </p>
+      )}
       <label>
-        사유(증빙 부족은 필수)
+        사유(증빙 부족 · AI 판단과 다른 확인은 필수)
         <textarea value={reason} onChange={(event) => setReason(event.target.value)} />
       </label>
       <div className="actions">

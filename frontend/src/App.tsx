@@ -6,6 +6,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { RoleProvider } from './context/RoleContext.tsx'
 import AppLayout from './layouts/AppLayout.tsx'
+import AIRecommendationLogPage from './pages/AIRecommendationLogPage.tsx'
 import ClaimDetailPage from './pages/ClaimDetailPage.tsx'
 import DemoPanelPage from './pages/DemoPanelPage.tsx'
 import EventLogPage from './pages/EventLogPage.tsx'
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="tasks" element={<TasksPage />} />
             <Route path="master-changes" element={<MasterChangePage />} />
             <Route path="events" element={<EventLogPage />} />
+            <Route path="ai-log" element={<AIRecommendationLogPage />} />
             <Route path="demo" element={<DemoPanelPage />} />
             <Route path="*" element={<NotReady title="없는 화면" roadmap="-" />} />
           </Route>

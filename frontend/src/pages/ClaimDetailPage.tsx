@@ -290,6 +290,11 @@ function NextAction({ detail, busy, error, run }: NextActionProps) {
   const { role, actor } = useRole()
   const { approval } = detail
   const lastPayment = detail.payments.at(-1)
+  // 결정을 기다리는 AI 추천. 다르게 고르면 서버가 사유를 요구한다(25). 대체 모드면 비교할 추천이 없다.
+  const pendingAi =
+    detail.ai_review !== null && detail.ai_review.human_decision === null
+      ? detail.ai_review.recommendation
+      : null
   const lastOffset = detail.offsets.at(-1)
   // 상계검토 건은 제안이 결정 · 동의까지 끝나야 남은 금액을 지급한다(서버도 409 로 막는다).
   const offsetFinished =
@@ -306,6 +311,7 @@ function NextAction({ detail, busy, error, run }: NextActionProps) {
     body = (
       <DecisionForm
         busy={busy}
+        aiRecommendation={pendingAi}
         onDecide={(decision, reason, explanationItems) =>
           run(() =>
             decideClaim(detail.rebate_id, {
@@ -332,6 +338,7 @@ function NextAction({ detail, busy, error, run }: NextActionProps) {
         </p>
         <DecisionForm
           busy={busy}
+          aiRecommendation={pendingAi}
           onDecide={(decision, reason, explanationItems) =>
             run(() =>
               decideApproval(approval.request_id, {

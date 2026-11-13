@@ -354,7 +354,7 @@ function FinanceForm({ offset, busy, run }: RunProps & { offset: OffsetProposal 
         />
       </label>
       <label>
-        사유(상계하지 않으면 필수)
+        사유(상계하지 않거나 AI 추천과 다르면 필수)
         <textarea value={reason} onChange={(event) => setReason(event.target.value)} />
       </label>
       <label>
