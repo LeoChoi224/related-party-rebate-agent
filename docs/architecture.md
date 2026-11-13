@@ -208,7 +208,7 @@ flowchart TD
 - `AR_ITEM` 은 원본 146행(대리점 채권 74 + 고객 채권 72)을 전부 저장한다. 고객 채권은 `customer_id` 만 있고 `agency_id` 는 비어 있다.
 - `IDENTITY_ATTR` 초기 행 = 대리점마다 대표자 · 주소 · 등록계좌 3행(`valid_from` = `registered_date`) + 입금마다 실입금계좌 1행(`valid_from` = `deposit_date`) = 150 + 32 = 182행.
 - `REBATE_CLAIM.status` 첫 값은 원본 상태에서 옮긴다: 승인 → 지급완료, 반려 → 반려, 미지급 → 미접수 **[가정]**. 원본 값은 `original_status` · `original_approver` · `original_payment_date` 에 그대로 남긴다.
-- **05 `feat/related-party-engine` 은 관련자 표 4개를 더한다**(`GROUP_VERSION` · `RELATED_GROUP` · `GROUP_MEMBER` · `RELATION_EDGE`). 버전 1 은 앱을 켤 때 시더 끝에서 계산한다. `trigger_change_id` 는 `MASTER_CHANGE` 와 함께 20 에서, `REBATE_CLAIM` 의 `min_authority` · `group_id` · `group_sum_krw` 는 한도 판정을 하는 06 에서 더한다.
+- **05 `feat/related-party-engine` 은 관련자 표 4개를 더한다**(`GROUP_VERSION` · `RELATED_GROUP` · `GROUP_MEMBER` · `RELATION_EDGE`). 버전 1 은 앱을 켤 때 시더 끝에서 계산한다. 정정과 그룹 버전의 연결은 20 에서 `MASTER_CHANGE` 가 정정 전 · 후 버전을 가리키는 것으로 한다(`GROUP_VERSION` 에 컬럼을 더하지 않는다). `REBATE_CLAIM` 의 `min_authority` · `group_id` · `group_sum_krw` 는 한도 판정을 하는 06 에서 더한다.
 - 판정: 대표자 · 주소 · 계좌 중 2개 이상 같으면 관련자, 1개면 정황. **계좌는 속성 1개**로, 대리점의 등록계좌와 실입금계좌를 한 묶음으로 보고 묶음끼리 하나라도 겹치면 일치다. 지금 유효한 속성(`valid_to` 가 비어 있음)만, 문자열이 정확히 같을 때만 일치로 본다.
 - `RELATED_GROUP` 은 **2곳 이상 묶인 그룹만** 저장한다(원본 기준 G1 하나). 그룹이 없는 대리점은 자기 금액만으로 한도를 본다. 라벨은 그룹 안 가장 작은 `agency_id` 순으로 G1, G2 … 를 붙인다.
 - `RELATION_EDGE` 는 1개 이상 일치한 쌍만 저장한다(원본 기준 4쌍: 관련자 3 · 정황 1). `agency_a` 가 작은 ID 다. `matched_attrs` 는 일치한 속성마다 값과 양쪽 근거 행(`IDENTITY_ATTR.source_ref`)을 담는다.
@@ -219,6 +219,7 @@ flowchart TD
 - **10 `feat/task-dispatcher` 는 `TASK` 를 더한다.** 작업은 상태 머신의 전이 함수 안에서 규칙표로 자동 생성된다(상태를 바꾸는 길이 하나라 빠지는 작업이 없다). 규칙표 키는 (이전 상태, 이후 상태)이고 이전 상태 조건이 없는 규칙은 "아무거나"다: 승인 → 재무 지급 실행, 소명대기 → 영업지원팀 소명 요청, 소명대기 → 지급보류 → 영업지원팀 추가 소명 요청, 지급지시 → 지급보류 → 재무 지급 계좌 확인, 상계검토 → 재무 상계 검토, 재검토필요 → 영업지원팀 재판정. 결재 대기(전결대기 · 상신대기)는 작업이 아니라 처리함에서 다룬다.
 - 건이 어떤 상태를 떠나면 그 상태(`trigger_status`)가 만든 열린 작업은 자동 완료된다(예: 승인 → 지급지시 이면 지급 실행 작업이 닫힘). 사람은 작업 API 로 열림 → 진행 → 완료를 표시하고, 완료는 다시 열 수 없다. 작업 상태 변경은 이력(`EVENT_LOG`)에 남기지 않는다. 상태 전이가 아닌 작업(접수 때 정황 소명 요청 · 24 의 감사 사후 검토)은 `trigger_status` · `created_by_event` 가 비어 있다. 부서 이름은 역할 이름과 같다.
 - **18 `feat/explanation-review-graph` 는 `EXPLANATION_REQUEST` · `EXPLANATION_REPLY` · `EXPLANATION_CHECK` 를 더한다.** 요청은 반려 · 지급보류 건에만 만들 수 있고(상신대기 G1 건 하나만 소명대기로 빠지면 3건이 한 묶음인 승인 요청과 어긋난다) 건은 소명대기가 된다. 요청 하나에 회신은 하나(`unique`)이고, 보완 회신은 새 요청으로 받는다. AI 판단(증빙 충분 · 부족)은 `AI_RECOMMENDATION`(승인 · 반려 · 소명 먼저)과 의미가 달라 `EXPLANATION_REPLY` 에 직접 두며, 그래서 `rec_id` 는 없다. 사람 확인 결과도 서비스가 같은 행에 적는다. 증빙 충분이면 소명대기 → 관계확인, 증빙 부족이면 소명대기 → 지급보류.
+- **20 `feat/master-correction-regroup` 은 `MASTER_CHANGE` 를 더한다.** 정정 가능한 속성은 대표자 · 주소 · 등록계좌뿐이다(실입금계좌는 돈이 들어온 사실이라 신고로 고칠 수 없다). 적용하면 이전 값의 `valid_to` 를 정정일로 닫고 `[주장]` 새 행(`source_ref` = `master_change:번호`)을 더하며, 원본 `AGENCY` 는 고치지 않는다. 그 뒤 모든 식별속성으로 그룹을 새 `GROUP_VERSION` 으로 다시 계산한다. 소속 그룹(구성원 집합)이 바뀐 대리점의 돈이 안 나간 건만 영향을 받아 재검토필요로 돌아가고, 그중 결재 대기였던 건은 한도 판정 코드가 바로 다시 판정해 결재 경로에 올린다. 그룹이 그대로면 영향 건이 없고 근거 쌍만 보여 준다(결론 유지). 열려 있던 승인 요청은 `decision = 취소` 로 표시하고 포함 건을 떼며, 열린 소명 요청도 취소한다.
 - **11 `feat/payment-mock` 은 `PAYMENT_ORDER` · `BANK_REPLY` 를 더한다.** 지급 지시는 재무만(403), 승인 건 또는 마지막 지시가 계좌오류였던 지급보류 건만 된다(409 — 증빙 부족으로 보류된 건이 지급되는 것을 막음). 은행 회신은 시연이 결과를 골라 넣는 API 이고 출처는 `모의`, 지시 하나에 회신 하나(두 번째는 409). 성공 → 지급완료, 계좌오류 → 지급보류(재무 계좌 확인 작업) → 다시 지시하면 새 지시를 만든다. 실제 수취계좌는 원본에 없어(설계안 2장) 지급 계좌 컬럼은 두지 않는다. 금액은 22 전까지 장려금액이다.
 
 ```mermaid
@@ -278,17 +279,20 @@ erDiagram
   MASTER_CHANGE {
     int change_id PK
     string agency_id FK
-    string attr_type
+    string attr_type "대표자 주소 등록계좌"
     string old_value
     string new_value
-    string raw_text "신고 원문"
-    string confirmed_by
-    datetime applied_at
+    date effective_date "이전 값 valid_to · 새 값 valid_from"
+    string reported_text "신고 원문 · 폼 입력이면 비어 있음"
+    string reported_by "적용한 영업지원팀"
+    string provenance "주장"
+    int group_version_before FK
+    int group_version_after FK
+    datetime created_at
   }
   GROUP_VERSION {
     int group_version_id PK
     int version_no
-    int trigger_change_id FK "없으면 초기 계산"
     bool is_current
     datetime created_at
   }
@@ -464,7 +468,7 @@ erDiagram
   AGENCY ||--o{ RELATION_EDGE : "관계 A"
   AGENCY ||--o{ RELATION_EDGE : "관계 B"
   DEPOSIT }o--o| AR_ITEM : "대사"
-  MASTER_CHANGE ||--o| GROUP_VERSION : "재계산 계기"
+  GROUP_VERSION ||--o{ MASTER_CHANGE : "정정 전 · 후 버전"
   GROUP_VERSION ||--o{ RELATED_GROUP : "포함"
   GROUP_VERSION ||--o{ RELATION_EDGE : "계산 결과"
   RELATED_GROUP ||--|{ GROUP_MEMBER : "구성원"
