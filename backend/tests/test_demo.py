@@ -28,6 +28,9 @@ EXPECTED_COUNTS = {
     "ai_recommendation": 0,
     "payment_order": 0,
     "bank_reply": 0,
+    "explanation_request": 0,
+    "explanation_reply": 0,
+    "explanation_check": 0,
 }
 
 
