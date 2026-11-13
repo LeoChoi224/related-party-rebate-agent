@@ -1,6 +1,6 @@
 """장려금 건 API.
 
-처리함 목록(13), 대상월 접수, 전결 건 결정, 지급 지시(11)가 있다. 건 상세는 14 에서 더한다.
+처리함 목록(13), 건 상세(14), 대상월 접수, 전결 건 결정, 지급 지시(11)가 있다.
 권한 부족(403) · 상태 전이 오류(409)는 main.py 의 처리기가 바꾸고, 요청 트랜잭션은 롤백된다.
 """
 
@@ -14,8 +14,9 @@ from app.models import Agency, RebateClaim, RelatedGroup
 from app.models.enums import ClaimStatus
 from app.schemas.approval import ClaimDecisionResult, DecisionRequest
 from app.schemas.payment import PaymentOrderRequest, PaymentOrderResult
-from app.schemas.rebate import ClaimListItem, IntakeResult
+from app.schemas.rebate import ClaimDetail, ClaimListItem, IntakeResult
 from app.services.approval import decide_claim
+from app.services.claim_detail import get_claim_detail
 from app.services.intake import intake_period
 from app.services.payment import order_payment
 
@@ -59,6 +60,15 @@ def list_claims(
         )
         for claim, agency_name, group_label in session.execute(query).all()
     ]
+
+
+@router.get("/{rebate_id}", responses={404: {"description": "장려금 건이 없음"}})
+def get_claim(rebate_id: str, session: SessionDep) -> ClaimDetail:
+    """건 상세: 원본 기록, 결재 경로 판정과 근거, 승인 요청, 지급, 이력."""
+    try:
+        return get_claim_detail(session, rebate_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.post(

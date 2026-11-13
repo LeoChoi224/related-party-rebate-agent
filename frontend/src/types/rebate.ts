@@ -1,8 +1,12 @@
 /**
  * 장려금 건 응답 타입. 백엔드 schemas/rebate.py 와 맞춘다.
- * 접수 결과와 처리함 목록 한 줄. 건 상세 타입은 14 에서 더한다.
+ * 접수 결과, 처리함 목록 한 줄, 건 상세.
  */
+import type { ApprovalSummary } from './approval.ts'
 import type { ApproverRole, ClaimStatus } from './enums.ts'
+import type { EventLogItem } from './eventLog.ts'
+import type { PaymentItem } from './payment.ts'
+import type { RelationEdge } from './relatedParty.ts'
 
 /** 대상월 접수 요약. 이름은 서버 JSON 그대로(snake_case) 둔다. */
 export type IntakeResult = {
@@ -25,4 +29,43 @@ export type ClaimListItem = {
   group_label: string | null
   /** 한도 판정 전이면 null */
   group_sum_krw: number | null
+}
+
+/** 판정 단위(그룹 또는 단독 대리점)의 같은 달 건 하나. */
+export type ClaimUnitMember = {
+  rebate_id: string
+  agency_id: string
+  agency_name: string
+  rebate_amount_krw: number
+  status: ClaimStatus
+}
+
+/** 건 상세. 원본 기록, 코드 판정, 판정 근거, 승인 요청, 지급, 이력. */
+export type ClaimDetail = {
+  // 원본 기록 [원본]
+  rebate_id: string
+  agency_id: string
+  agency_name: string
+  period_ym: string
+  sales_performance_krw: number
+  rebate_amount_krw: number
+  original_status: string
+  original_approver: string | null
+  /** "2026-06-15" 같은 날짜 글자. 원본이 NONE 이면 null */
+  original_payment_date: string | null
+  source_file: string
+  source_row: number
+  // 업무 상태와 코드 판정
+  status: ClaimStatus
+  min_authority: ApproverRole | null
+  group_label: string | null
+  group_sum_krw: number | null
+  /** 규정 한도(서버 상수). 화면에 2,000,000 을 따로 적지 않는다. */
+  limit_krw: number
+  // 판정 근거와 그 뒤의 처리
+  unit_claims: ClaimUnitMember[]
+  evidence: RelationEdge[]
+  approval: ApprovalSummary | null
+  payments: PaymentItem[]
+  events: EventLogItem[]
 }

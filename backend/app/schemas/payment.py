@@ -7,6 +7,7 @@
 from pydantic import BaseModel, Field
 
 from app.models.enums import BankResult
+from app.schemas.common import UtcDatetime
 
 
 class PaymentOrderRequest(BaseModel):
@@ -31,3 +32,16 @@ class BankReplyResult(BaseModel):
     result: str
     provenance: str
     claim_status: str
+
+
+class PaymentOut(BaseModel):
+    """건 상세의 지급 한 줄: 지급 지시와 그 은행 회신. 회신 전이면 회신 칸이 비어 있다."""
+
+    payment_id: int
+    amount_krw: int
+    status: str
+    ordered_by: str
+    ordered_at: UtcDatetime
+    bank_result: str | None
+    bank_provenance: str | None
+    replied_at: UtcDatetime | None

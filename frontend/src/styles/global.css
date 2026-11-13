@@ -1,6 +1,6 @@
 /**
  * 전역 스타일: 색 변수, 기본 글꼴, 레이아웃(상단 + 왼쪽 메뉴 + 가운데), 표 · 버튼 · 오류 기본 모양,
- * 상태 배지 · 처리함 필터.
+ * 상태 배지 · 처리함 필터, 건 상세 구획 · 출처 배지.
  */
 :root {
   --bg: #f6f7f9;
@@ -161,4 +161,65 @@ td {
 .badge-stop {
   color: var(--danger);
   background: #fbe7e7;
+}
+
+.detail-section {
+  margin-top: 24px;
+}
+
+/* 제목 · 값 두 칸 격자 */
+dl.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+dl.facts dt {
+  color: var(--muted);
+}
+
+dl.facts dd {
+  margin: 0;
+}
+
+.badge-prov {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.current-row {
+  font-weight: 700;
+}
+
+textarea {
+  width: 100%;
+  max-width: 480px;
+  min-height: 64px;
+  font: inherit;
+}
+
+/* 다음 행동 구획은 눈에 띄게 테두리를 둔다. */
+.next-action {
+  padding: 12px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.decision-form label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+/* 사유 칸은 안내 글 아래 줄에 둔다. */
+.decision-form textarea {
+  display: block;
+  margin-top: 4px;
+}
+
+button.danger {
+  border-color: var(--danger);
+  background: var(--danger);
 }
