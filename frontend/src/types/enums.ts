@@ -50,6 +50,13 @@ export const TaskStatus = {
 } as const
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus]
 
+export const PaymentStatus = {
+  AWAITING_REPLY: '회신대기',
+  SUCCEEDED: '성공',
+  ACCOUNT_ERROR: '계좌오류',
+} as const
+export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus]
+
 export const BankResult = {
   SUCCESS: '성공',
   ACCOUNT_ERROR: '계좌오류',
@@ -63,3 +70,9 @@ export const Provenance = {
   MOCK: '모의',
 } as const
 export type Provenance = (typeof Provenance)[keyof typeof Provenance]
+
+export const RelationJudgement = {
+  RELATED: '관련자',
+  CIRCUMSTANTIAL: '정황',
+} as const
+export type RelationJudgement = (typeof RelationJudgement)[keyof typeof RelationJudgement]

@@ -27,7 +27,8 @@ function errorMessage(data: unknown, status: number): string {
       return detail
         .map((item: unknown) =>
           typeof item === 'object' && item !== null && 'msg' in item
-            ? String(item.msg)
+            ? // Pydantic 이 직접 만든 검사 오류(model_validator)에는 "Value error, " 가 앞에 붙는다.
+              String(item.msg).replace(/^Value error, /, '')
             : String(item),
         )
         .join(' / ')
