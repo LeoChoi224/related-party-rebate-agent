@@ -16,12 +16,19 @@ class DecisionRequest(BaseModel):
     reason: str = ""
     actor: str = Field(min_length=1, examples=["박임원"])
     role: str = Field(min_length=1, examples=["영업임원"])
+    # 반려하면서 대리점에 소명을 요청할 항목(21). 반려된 건마다 소명 요청이 하나씩 생긴다.
+    explanation_items: list[str] = []
 
     @model_validator(mode="after")
     def reject_needs_reason(self) -> "DecisionRequest":
         # decision 과 reason 을 함께 봐야 해서 필드가 아니라 객체 전체를 검사한다.
         if self.decision == Decision.REJECT and not self.reason.strip():
             raise ValueError("반려 사유를 입력해야 합니다")
+        if self.explanation_items:
+            if self.decision != Decision.REJECT:
+                raise ValueError("소명 요청은 반려할 때만 함께 보낼 수 있습니다")
+            if any(not item.strip() for item in self.explanation_items):
+                raise ValueError("소명 요청 항목은 비울 수 없습니다")
         return self
 
 
@@ -30,11 +37,14 @@ class ApprovalDecisionResult(BaseModel):
     decision: str
     decided_by: str
     rebate_ids: list[str]
+    # 반려와 함께 만든 소명 요청(21). 건마다 하나.
+    explanation_ids: list[int] = []
 
 
 class ClaimDecisionResult(BaseModel):
     rebate_id: str
     status: str
+    explanation_ids: list[int] = []
 
 
 class ApprovalSummary(BaseModel):

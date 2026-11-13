@@ -1,6 +1,7 @@
 """상신 API.
 
 지금은 승인 요청 결정만 있다. 요청 내용은 건 상세(14)의 승인 요청 칸에서 본다.
+반려할 때 소명 항목을 함께 보내면 반려된 건마다 소명 요청이 만들어진다(21).
 09 서비스가 권한 · 상태를 검사하고 바꾼 뒤에만 기다리는 AI 검토를 재개한다(17).
 권한 부족(403) · 상태 전이 오류(409)는 main.py 의 처리기가 바꾸고, 요청 트랜잭션은 롤백된다.
 """
@@ -12,6 +13,7 @@ from app.api.deps import SessionDep
 from app.schemas.approval import ApprovalDecisionResult, DecisionRequest
 from app.services.approval import decide_approval
 from app.services.claim_detail import TARGET_REQUEST
+from app.services.explanation import request_explanations
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -49,9 +51,14 @@ def decide(
         reason=body.reason,
         actor=body.actor,
     )
+    # 반려와 함께 소명을 요청하면 반려된 건마다 요청이 생기고 건이 소명대기로 넘어간다(21).
+    explanation_ids = request_explanations(
+        session, claims, body.explanation_items, actor=body.actor, role=body.role
+    )
     return ApprovalDecisionResult(
         request_id=approval.request_id,
         decision=approval.decision,
         decided_by=approval.decided_by,
         rebate_ids=[c.rebate_id for c in claims],
+        explanation_ids=explanation_ids,
     )

@@ -4,7 +4,7 @@
     상신대기 건은 요청하지 못한다. 전이표는 허용하지만 G1 건 하나만 빠지면 3건이 한 묶음인 승인 요청과 어긋난다.
     상신 건은 임원이 승인 요청을 반려한 뒤(건이 반려가 됨) 이 길로 온다. 반려 결정과의 연결은 21 이다.
 회신: 대리점 회신 [모의]. 요청 하나에 회신 하나이고 건 상태는 바뀌지 않는다.
-확인: 영업지원팀만. 증빙 충분 → 관계확인, 증빙 부족 → 지급보류. 확인 결과 컬럼은 AI 검토를 거쳤는지와
+확인: 영업지원팀만. 증빙 충분 → 관계확인 → 바로 재판정해 전결대기 · 상신대기(재상신), 증빙 부족 → 지급보류. 확인 결과 컬럼은 AI 검토를 거쳤는지와
     상관없이 이 서비스가 적는다(그래프를 한 번도 안 돌린 회신도 확인할 수 있어야 한다).
 모두 commit 하지 않는다. 409 는 InvalidTransitionError, 403 은 InsufficientAuthorityError 를 쓴다.
 """
@@ -32,6 +32,7 @@ from app.schemas.explanation import (
 )
 from app.services.approval import InsufficientAuthorityError
 from app.services.claim_state import InvalidTransitionError, transition
+from app.services.rejudge import rejudge_claims
 
 REQUESTABLE = frozenset({ClaimStatus.REJECTED, ClaimStatus.ON_HOLD})
 REQUESTER_ROLES = frozenset({ApproverRole.SALES_SUPPORT, ApproverRole.SALES_EXECUTIVE})
@@ -94,6 +95,25 @@ def request_explanation(
     return request
 
 
+def request_explanations(
+    session: Session,
+    claims: list[RebateClaim],
+    items: list[str],
+    *,
+    actor: str,
+    role: str,
+) -> list[int]:
+    """반려된 건마다 같은 항목으로 소명을 요청한다(21). 대리점마다 회신이 따로 오므로 요청은 건 단위다."""
+    if not items:
+        return []
+    return [
+        request_explanation(
+            session, claim.rebate_id, items=items, actor=actor, role=role
+        ).exp_id
+        for claim in claims
+    ]
+
+
 def register_reply(session: Session, exp_id: int, raw_text: str) -> ExplanationReply:
     """대리점 회신 [모의] 을 등록한다. 요청 하나에 한 번만."""
     request = session.get(ExplanationRequest, exp_id)
@@ -150,6 +170,15 @@ def confirm_explanation(
         reason=reason.strip() or f"소명 확인: {judgement}",
         payload={"exp_id": request.exp_id, "reply_id": reply_id},
     )
+    if judgement == ExplanationJudgement.SUFFICIENT:
+        # 소명이 충분하면 건을 지금 그룹으로 다시 판정해 결재 경로에 다시 올린다(재상신, 21).
+        rejudge_claims(
+            session,
+            [claim],
+            actor=actor,
+            role=role,
+            reason="소명 증빙 충분 — 재판정",
+        )
     reply.review_result = judgement
     reply.review_reason = reason.strip() or None
     reply.reviewed_by = actor

@@ -21,9 +21,11 @@ from app.schemas.payment import PaymentOrderRequest, PaymentOrderResult
 from app.schemas.rebate import ClaimDetail, ClaimListItem, IntakeResult
 from app.services.approval import decide_claim
 from app.services.claim_detail import TARGET_CLAIM, get_claim_detail
+from app.services.explanation import request_explanations
 from app.services.intake import intake_period
-from app.services.master_change import latest_request_id, rejudge_claim
+from app.services.master_change import rejudge_claim
 from app.services.payment import order_payment
+from app.services.rejudge import latest_request_id
 
 router = APIRouter(prefix="/claims", tags=["claims"])
 
@@ -135,7 +137,15 @@ def decide(
         reason=body.reason,
         actor=body.actor,
     )
-    return ClaimDecisionResult(rebate_id=claim.rebate_id, status=claim.status)
+    # 반려와 함께 소명을 요청하면 건이 소명대기로 넘어간다(21).
+    explanation_ids = request_explanations(
+        session, [claim], body.explanation_items, actor=body.actor, role=body.role
+    )
+    return ClaimDecisionResult(
+        rebate_id=claim.rebate_id,
+        status=claim.status,
+        explanation_ids=explanation_ids,
+    )
 
 
 @router.post(
