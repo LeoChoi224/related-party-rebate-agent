@@ -8,6 +8,7 @@ from app.schemas.ai_recommendation import AiReviewOut
 from app.schemas.approval import ApprovalSummary
 from app.schemas.event_log import EventLogOut
 from app.schemas.explanation import ExplanationOut
+from app.schemas.offset import OffsetOut
 from app.schemas.payment import PaymentOut
 from app.schemas.related_party import RelationEdgeOut
 
@@ -81,3 +82,7 @@ class ClaimDetail(BaseModel):
     ai_review: AiReviewOut | None
     # 이 건의 소명 요청들(요청 ID 순). 요청마다 회신 · AI 주장 대조 · 사람 확인이 붙는다.
     explanations: list[ExplanationOut]
+    # 이 건의 상계 제안들(ID 순) [가정]. 관련자 그룹 건이 승인됐을 때 연체 채권이 있으면 생긴다(22).
+    offsets: list[OffsetOut]
+    # 지금 지급할 금액 = 장려금액 - 확정된 상계액. 상계가 없으면 장려금액과 같다.
+    payable_krw: int

@@ -13,6 +13,7 @@ from app.api.routes import (
     events,
     explanations,
     health,
+    offsets,
     payments,
     tasks,
 )
@@ -27,3 +28,4 @@ api_router.include_router(payments.router)
 api_router.include_router(events.router)
 api_router.include_router(explanations.router)
 api_router.include_router(agencies.router)
+api_router.include_router(offsets.router)

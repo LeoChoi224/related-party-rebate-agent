@@ -1,4 +1,4 @@
-"""그래프 노드가 쓰는 프롬프트. 지금은 장려금 검토(claim_review)만 있다.
+"""AI 가 쓰는 프롬프트: 장려금 검토(claim_review) · 소명 검토(explanation_review) · 상계액 추천(22).
 
 사실(원본 데이터)은 지시문과 섞지 않고 JSON 으로 따로 넣는다.
 대리점 이름 같은 원본 문자열이 지시처럼 읽히지 않게 하려는 것이다.
@@ -135,6 +135,43 @@ def explanation_assess_messages(
             "human",
             "아래 대조 결과(JSON)를 종합해 판단하세요.\n"
             + json.dumps(payload, ensure_ascii=False, indent=2),
+        ),
+    ]
+    if problems:
+        messages.append(
+            (
+                "human",
+                "이전 답에 문제가 있었습니다. 고쳐서 다시 답하세요:\n- "
+                + "\n- ".join(problems),
+            )
+        )
+    return messages
+
+
+OFFSET_ADVICE_SYSTEM = """\
+당신은 판매장려금 지급 전 미수채권 상계를 돕는 재무 보조입니다. 최종 결정은 재무 담당자가 하고,
+상계는 대리점이 동의해야 확정됩니다.
+
+규칙:
+- 상계 대상은 같은 관련자 그룹 대리점의 90일 넘게 연체된 채권입니다(교육용 가정).
+- 상계 한도(max_offset_krw)는 코드가 계산한 값입니다. 추천 상계액은 0 이상 한도 이하여야 합니다.
+- 0 은 상계하지 말고 전액 지급하라는 뜻입니다. 일부만 상계하면 차액을 현금으로 지급합니다.
+- 회수 가능성(연체일 · 잔액)과 대리점 관계 부담을 함께 보고, 근거와 반대 근거를 쓰세요.
+- 근거 문장에 채권 사실을 쓸 때는 끝에 근거 행(파일:행)을 붙이세요.
+- 사실에 없는 내용을 지어내지 마세요.
+"""
+
+
+def offset_advice_messages(
+    facts: dict[str, Any], problems: list[str] | None = None
+) -> list[tuple[str, str]]:
+    """시스템 지시 + 사실(JSON). 이전 답이 가드에 걸렸으면 그 문제를 알려 다시 쓰게 한다."""
+    messages = [
+        ("system", OFFSET_ADVICE_SYSTEM),
+        (
+            "human",
+            "아래 사실(JSON)만 근거로 이 장려금 건의 상계액을 추천하세요.\n"
+            + json.dumps(facts, ensure_ascii=False, indent=2),
         ),
     ]
     if problems:

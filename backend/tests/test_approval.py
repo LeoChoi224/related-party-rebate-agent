@@ -200,7 +200,10 @@ def test_api_reject_without_reason_is_422(client):
 
 
 def test_api_executive_approves_then_second_try_is_409(client, api_engine):
-    """영업임원 승인은 200, 같은 요청을 다시 결정하면 409 이고 첫 결정이 남는다."""
+    """영업임원 승인은 200, 같은 요청을 다시 결정하면 409 이고 첫 결정이 남는다.
+
+    G1 은 그룹에 연체 채권이 있어 승인 직후 3건 모두 상계검토로 넘어간다(22).
+    """
     res = decide_request(client, decision="승인", **EXECUTIVE)
     assert res.status_code == 200
     assert res.json() == {
@@ -209,10 +212,11 @@ def test_api_executive_approves_then_second_try_is_409(client, api_engine):
         "decided_by": "박임원",
         "rebate_ids": G1_CLAIMS,
         "explanation_ids": [],
+        "offset_ids": [1, 2, 3],
     }
     assert decide_request(client, decision="승인", **EXECUTIVE).status_code == 409
     with Session(api_engine) as session:
-        assert statuses(session, G1_CLAIMS) == ["승인"] * 3
+        assert statuses(session, G1_CLAIMS) == ["상계검토"] * 3
 
 
 @pytest.mark.parametrize(
@@ -242,6 +246,7 @@ def test_api_support_decides_claim(client):
         "rebate_id": D001_JUNE,
         "status": "승인",
         "explanation_ids": [],
+        "offset_ids": [],
     }
 
 

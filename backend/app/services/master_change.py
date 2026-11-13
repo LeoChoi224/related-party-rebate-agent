@@ -9,7 +9,7 @@
    AI 가 아니라 한도 판정 코드(06)의 계산이라 사람 결정을 대신하지 않는다. 그 밖의 상태(승인 · 소명대기 ·
    지급보류 등)는 재검토필요로 두고, 영업지원팀이 rejudge_claim 으로 직접 다시 판정한다.
    AI 검토(claim_review)는 다시 판정된 건 상세에서 사람이 누른다.
-열려 있던 승인 요청은 판정 단위가 바뀌어 결정할 수 없으므로 취소하고, 열린 소명 요청도 취소한다.
+열려 있던 승인 요청은 판정 단위가 바뀌어 결정할 수 없으므로 취소하고, 열린 소명 요청 · 상계 제안도 취소한다.
 """
 
 import logging
@@ -55,6 +55,7 @@ from app.services.approval import (
 from app.services.claim_state import REVIEW_FROM, InvalidTransitionError, transition
 from app.services.explanation import OPEN_STATUSES
 from app.services.intake import SYSTEM_ACTOR
+from app.services.offset import cancel_open_offsets
 from app.services.rejudge import latest_request_id, rejudge_claims
 from app.services.related_party import find_related_parties, save_group_version
 
@@ -259,6 +260,8 @@ def _reopen_claims(
         )
         .values(status=ExplanationStatus.CANCELLED)
     )
+    # 상계 한도는 판정 당시 그룹의 연체 채권으로 계산했다. 그룹이 바뀌면 다시 승인될 때 새로 만든다.
+    cancel_open_offsets(session, ids)
     for claim in claims:
         transition(
             session,

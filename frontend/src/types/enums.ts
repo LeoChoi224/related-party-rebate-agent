@@ -109,3 +109,24 @@ export const ExplanationJudgement = {
   INSUFFICIENT: '증빙 부족',
 } as const
 export type ExplanationJudgement = (typeof ExplanationJudgement)[keyof typeof ExplanationJudgement]
+
+/** 상계 제안 한 건의 진행 상태 [가정]. 재무검토 · 동의대기 가 열린 상태다. */
+export const OffsetStatus = {
+  AWAITING_FINANCE: '재무검토',
+  AWAITING_CONSENT: '동의대기',
+  SETTLED: '상계확정',
+  /** 재무가 상계하지 않기로 함 → 전액 지급 */
+  FINANCE_REJECTED: '재무반려',
+  /** 대리점이 동의하지 않음 → 전액 지급 */
+  CONSENT_REFUSED: '동의거절',
+  /** 정정 신고로 건이 재검토필요로 돌아감 */
+  CANCELLED: '취소',
+} as const
+export type OffsetStatus = (typeof OffsetStatus)[keyof typeof OffsetStatus]
+
+/** 상계에 대한 대리점 회신 [모의] */
+export const AgencyConsent = {
+  CONSENT: '동의',
+  REFUSE: '거절',
+} as const
+export type AgencyConsent = (typeof AgencyConsent)[keyof typeof AgencyConsent]

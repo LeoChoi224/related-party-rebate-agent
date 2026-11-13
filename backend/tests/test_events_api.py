@@ -53,7 +53,8 @@ def test_filter_by_claim(client):
 
 
 def test_filter_by_actor_role(client):
-    """접수는 모두 시스템이 한다. 영업임원이 결정하면 그 3줄이 맨 위에 온다."""
+    """접수는 모두 시스템이 한다. 영업임원이 결정하면 그 3줄이 위에 오고,
+    그 위에 승인 직후 시스템이 상계검토로 넘긴 3줄이 온다(22)."""
     assert len(events(client, actor_role="시스템")) == 120
     assert events(client, actor_role="영업임원") == []
 
@@ -62,7 +63,8 @@ def test_filter_by_actor_role(client):
 
     rows = events(client, actor_role="영업임원")
     assert [r["entity_id"] for r in rows] == ["RB-00180", "RB-00120", "RB-00054"]
-    assert events(client)[0]["actor"] == "박임원"
+    newest = [(r["actor"], r["to_status"]) for r in events(client)[:4]]
+    assert newest == [("시스템", "상계검토")] * 3 + [("박임원", "승인")]
 
 
 def test_unknown_filters_are_empty_not_errors(client):

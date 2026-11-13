@@ -138,3 +138,24 @@ class ExplanationJudgement(StrEnum):
 
     SUFFICIENT = "증빙 충분"
     INSUFFICIENT = "증빙 부족"
+
+
+class OffsetStatus(StrEnum):
+    """상계 제안 한 건의 진행 상태 [가정]. 재무검토 · 동의대기 가 열린 상태다."""
+
+    AWAITING_FINANCE = "재무검토"
+    AWAITING_CONSENT = "동의대기"
+    SETTLED = "상계확정"
+    # 재무가 상계하지 않기로 함 → 전액 지급
+    FINANCE_REJECTED = "재무반려"
+    # 대리점이 동의하지 않음 → 상계할 수 없어 전액 지급
+    CONSENT_REFUSED = "동의거절"
+    # 정정 신고로 건이 재검토필요로 돌아가 판정 단위가 바뀜(20)
+    CANCELLED = "취소"
+
+
+class AgencyConsent(StrEnum):
+    """상계에 대한 대리점 회신 [모의]."""
+
+    CONSENT = "동의"
+    REFUSE = "거절"

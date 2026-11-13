@@ -18,6 +18,8 @@ export type ClaimDecisionResult = {
   status: ClaimStatus
   /** 반려와 함께 만든 소명 요청 */
   explanation_ids: number[]
+  /** 승인 뒤 같은 그룹 연체 채권으로 만든 상계 제안 */
+  offset_ids: number[]
 }
 
 export type ApprovalDecisionResult = {
@@ -26,6 +28,7 @@ export type ApprovalDecisionResult = {
   decided_by: string
   rebate_ids: string[]
   explanation_ids: number[]
+  offset_ids: number[]
 }
 
 /** 건 상세의 승인 요청 칸. 결정 전에는 결정 · 사유 · 결정자 · 시각이 null 이다. */

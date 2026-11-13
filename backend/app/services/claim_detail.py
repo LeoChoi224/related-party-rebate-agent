@@ -1,6 +1,6 @@
 """건 상세 조회.
 
-여러 표에 흩어진 판정 근거(판정 단위 구성 건 · 관련자 일치 쌍), 승인 요청, 지급, 이력을
+여러 표에 흩어진 판정 근거(판정 단위 구성 건 · 관련자 일치 쌍), 승인 요청, 상계, 지급, 이력을
 한 응답으로 모은다. 읽기만 하고 아무것도 바꾸지 않는다.
 AI 검토 단위(review_unit)도 여기서 정한다. 상세가 그 단위의 추천을 싣고, 그래프(17)가 같은 함수를 쓴다.
 결과 모양을 만드는 것 자체가 일이라, 다른 서비스와 달리 응답 스키마를 바로 돌려준다.
@@ -31,6 +31,7 @@ from app.schemas.rebate import ClaimDetail, ClaimUnitMember
 from app.schemas.related_party import RelationEdgeOut
 from app.services.approval_authority import REBATE_LIMIT_KRW
 from app.services.explanation import list_explanations
+from app.services.offset import list_offsets, payable_krw
 
 # AI 검토 단위의 종류. EventLog · Task 의 대상 종류와 같은 표 이름 표기다.
 TARGET_CLAIM = "rebate_claim"
@@ -90,6 +91,8 @@ def get_claim_detail(session: Session, rebate_id: str) -> ClaimDetail:
         events=_events(session, rebate_id),
         ai_review=_ai_review(session, rebate_id),
         explanations=list_explanations(session, rebate_id),
+        offsets=list_offsets(session, rebate_id),
+        payable_krw=payable_krw(session, claim),
     )
 
 

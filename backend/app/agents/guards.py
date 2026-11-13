@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from app.models.enums import CheckVerdict, ExplanationJudgement
 from app.schemas.ai_recommendation import ClaimAssessment
 from app.schemas.explanation import CheckResult, ExplanationAssessment
+from app.schemas.offset import OffsetAdvice
 from app.services.approval_authority import has_authority
 
 
@@ -79,4 +80,22 @@ def check_explanation_assessment(
             )
     elif not assessment.follow_up_request.strip():
         problems.append("증빙 부족이면 추가 요청문을 써야 합니다")
+    return GuardResult(ok=not problems, problems=problems)
+
+
+def check_offset_advice(advice: OffsetAdvice, *, max_offset_krw: int) -> GuardResult:
+    """AI 상계액 추천을 코드가 계산한 상계 한도와 맞춰 본다. 문제가 있으면 다시 생성할 대상이다.
+
+    한도를 넘는 추천은 코드 값으로 깎지 않고 다시 묻는다. 깎으면 근거 문장이 틀린 금액을 말하게 된다.
+    """
+    problems = []
+    if not 0 <= advice.confidence <= 1:
+        problems.append(f"확신도 {advice.confidence} 이(가) 0~1 밖입니다")
+    if not advice.rationale:
+        problems.append("근거가 비어 있습니다")
+    if not 0 <= advice.offset_amount_krw <= max_offset_krw:
+        problems.append(
+            f"추천 상계액 {advice.offset_amount_krw:,}원이 0~상계 한도 "
+            f"{max_offset_krw:,}원 밖입니다"
+        )
     return GuardResult(ok=not problems, problems=problems)

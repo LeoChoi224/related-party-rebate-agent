@@ -211,13 +211,16 @@ def client(tmp_path, api_engine):
 
 
 def test_api_lists_tasks_by_department(client):
-    """접수 뒤 정황 2건, G1 승인 뒤 재무 3건. dept 로 부서별로 거른다."""
+    """접수 뒤 정황 2건, G1 승인 뒤 재무 6건. dept 로 부서별로 거른다.
+
+    G1 은 승인 직후 상계검토로 넘어가(22) 지급 실행 3건이 닫히고 상계 검토 3건이 열린다.
+    """
     all_tasks = client.get("/api/tasks").json()
-    assert len(all_tasks) == 5
+    assert len(all_tasks) == 8
     finance = client.get("/api/tasks", params={"dept": "재무"}).json()
-    assert [(t["ref_id"], t["task_type"]) for t in finance] == [
-        (rebate_id, "지급 실행") for rebate_id in G1_CLAIMS
-    ]
+    assert [(t["ref_id"], t["task_type"], t["status"]) for t in finance] == [
+        (rebate_id, "지급 실행", "완료") for rebate_id in G1_CLAIMS
+    ] + [(rebate_id, "상계 검토", "열림") for rebate_id in G1_CLAIMS]
     support = client.get("/api/tasks", params={"dept": "영업지원팀"}).json()
     assert [t["ref_id"] for t in support] == CIRCUMSTANTIAL
     assert support[0]["detail"] == "D-034–D-041 대표자 일치(정황)"
@@ -241,18 +244,18 @@ def test_api_task_moves_open_progress_done_then_409(client):
 
 
 def test_api_transition_task_cannot_be_closed_by_hand(client):
-    """G1 지급 실행 작업(3번)은 진행은 되지만, 건이 아직 승인이라 손으로 완료하면 409."""
-    assert client.patch("/api/tasks/3", json={"status": "진행"}).status_code == 200
+    """G1 상계 검토 작업(6번)은 진행은 되지만, 건이 아직 상계검토라 손으로 완료하면 409."""
+    assert client.patch("/api/tasks/6", json={"status": "진행"}).status_code == 200
 
-    res = client.patch("/api/tasks/3", json={"status": "완료"})
+    res = client.patch("/api/tasks/6", json={"status": "완료"})
     assert res.status_code == 409
     assert res.json() == {
-        "detail": "건 RB-00054 이(가) 아직 승인 상태라 '지급 실행' 작업을 닫을 수 없습니다. "
-        "건을 처리하면 자동으로 닫힙니다 (작업 3)"
+        "detail": "건 RB-00054 이(가) 아직 상계검토 상태라 '상계 검토' 작업을 닫을 수 없습니다. "
+        "건을 처리하면 자동으로 닫힙니다 (작업 6)"
     }
     # 거절된 요청은 아무것도 바꾸지 않는다.
     task = client.get("/api/tasks", params={"status": "진행"}).json()[0]
-    assert (task["task_id"], task["closed_at"]) == (3, None)
+    assert (task["task_id"], task["closed_at"]) == (6, None)
 
 
 def test_api_lists_tasks_by_several_statuses(client):
@@ -260,8 +263,8 @@ def test_api_lists_tasks_by_several_statuses(client):
     client.patch("/api/tasks/1", json={"status": "완료"})
     client.patch("/api/tasks/2", json={"status": "진행"})
     todo = client.get("/api/tasks", params={"status": ["열림", "진행"]}).json()
-    assert [t["task_id"] for t in todo] == [2, 3, 4, 5]
-    assert len(client.get("/api/tasks").json()) == 5
+    assert [t["task_id"] for t in todo] == [2, 6, 7, 8]
+    assert len(client.get("/api/tasks").json()) == 8
 
 
 def test_api_task_times_are_marked_utc(client):
