@@ -15,9 +15,10 @@ from app.models.explanation import (
     ExplanationRequest,
 )
 from app.models.master_change import MasterChange
+from app.models.offset import OffsetProposal
 from app.models.payment import BankReply, PaymentOrder
 from app.models.rebate import RebateClaim
-from app.models.receivable import ARItem
+from app.models.receivable import ARAdjustment, ARItem
 from app.models.related_party import (
     GroupMember,
     GroupVersion,
@@ -28,6 +29,7 @@ from app.models.task import Task
 
 __all__ = [
     "AIRecommendation",
+    "ARAdjustment",
     "ARItem",
     "Agency",
     "ApprovalItem",
@@ -43,6 +45,7 @@ __all__ = [
     "GroupVersion",
     "IdentityAttribute",
     "MasterChange",
+    "OffsetProposal",
     "PaymentOrder",
     "RebateClaim",
     "RelatedGroup",

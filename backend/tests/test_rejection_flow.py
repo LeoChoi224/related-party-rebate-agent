@@ -223,8 +223,9 @@ def test_g1_claims_come_back_one_by_one_into_one_request(client):
         json={"decision": "승인", "reason": "", **EXECUTIVE},
     )
     assert approve.status_code == 200
+    # 승인된 두 건은 그룹 연체 채권 때문에 바로 상계검토로 넘어간다(22).
     assert [detail(client, r)["status"] for r in G1_CLAIMS] == [
-        "승인",
-        "승인",
+        "상계검토",
+        "상계검토",
         "지급보류",
     ]

@@ -2,6 +2,7 @@
 
 지금은 승인 요청 결정만 있다. 요청 내용은 건 상세(14)의 승인 요청 칸에서 본다.
 반려할 때 소명 항목을 함께 보내면 반려된 건마다 소명 요청이 만들어진다(21).
+승인하면 같은 그룹 연체 채권이 있는 건마다 상계 제안이 생기고 건이 상계검토로 넘어간다(22).
 09 서비스가 권한 · 상태를 검사하고 바꾼 뒤에만 기다리는 AI 검토를 재개한다(17).
 권한 부족(403) · 상태 전이 오류(409)는 main.py 의 처리기가 바꾸고, 요청 트랜잭션은 롤백된다.
 """
@@ -10,10 +11,12 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.agents.graphs.claim_review import record_human_decision
 from app.api.deps import SessionDep
+from app.models.enums import Decision
 from app.schemas.approval import ApprovalDecisionResult, DecisionRequest
 from app.services.approval import decide_approval
 from app.services.claim_detail import TARGET_REQUEST
 from app.services.explanation import request_explanations
+from app.services.offset import open_offset_reviews
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -55,10 +58,17 @@ def decide(
     explanation_ids = request_explanations(
         session, claims, body.explanation_items, actor=body.actor, role=body.role
     )
+    # 승인된 그룹 건에 연체 채권이 있으면 지급 전에 상계를 검토한다(22). 건마다 제안 하나.
+    offset_ids = (
+        open_offset_reviews(session, claims)
+        if body.decision == Decision.APPROVE
+        else []
+    )
     return ApprovalDecisionResult(
         request_id=approval.request_id,
         decision=approval.decision,
         decided_by=approval.decided_by,
         rebate_ids=[c.rebate_id for c in claims],
         explanation_ids=explanation_ids,
+        offset_ids=offset_ids,
     )

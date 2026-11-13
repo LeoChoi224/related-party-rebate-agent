@@ -39,12 +39,15 @@ class ApprovalDecisionResult(BaseModel):
     rebate_ids: list[str]
     # 반려와 함께 만든 소명 요청(21). 건마다 하나.
     explanation_ids: list[int] = []
+    # 승인 뒤 같은 그룹 연체 채권으로 만든 상계 제안(22). 건마다 하나.
+    offset_ids: list[int] = []
 
 
 class ClaimDecisionResult(BaseModel):
     rebate_id: str
     status: str
     explanation_ids: list[int] = []
+    offset_ids: list[int] = []
 
 
 class ApprovalSummary(BaseModel):

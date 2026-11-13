@@ -2,6 +2,7 @@
 
 처리함 목록(13), 건 상세(14), 대상월 접수, 전결 건 결정, 지급 지시(11), AI 검토(17)가 있다.
 전결 결정은 09 서비스가 권한 · 상태를 검사하고 바꾼 뒤에만 기다리는 AI 검토를 재개한다.
+승인된 건이 관련자 그룹이고 그룹에 연체 채권이 있으면 같은 트랜잭션에서 상계검토로 넘어간다(22).
 권한 부족(403) · 상태 전이 오류(409)는 main.py 의 처리기가 바꾸고, 요청 트랜잭션은 롤백된다.
 """
 
@@ -13,7 +14,7 @@ from sqlalchemy import select
 from app.agents.graphs.claim_review import record_human_decision, start_claim_review
 from app.api.deps import ReviewModelDep, SessionDep
 from app.models import Agency, RebateClaim, RelatedGroup
-from app.models.enums import ClaimStatus
+from app.models.enums import ClaimStatus, Decision
 from app.schemas.ai_recommendation import AiReviewOut
 from app.schemas.approval import ClaimDecisionResult, DecisionRequest
 from app.schemas.master_change import RejudgeRequest, RejudgeResult
@@ -24,6 +25,7 @@ from app.services.claim_detail import TARGET_CLAIM, get_claim_detail
 from app.services.explanation import request_explanations
 from app.services.intake import intake_period
 from app.services.master_change import rejudge_claim
+from app.services.offset import open_offset_reviews
 from app.services.payment import order_payment
 from app.services.rejudge import latest_request_id
 
@@ -141,10 +143,17 @@ def decide(
     explanation_ids = request_explanations(
         session, [claim], body.explanation_items, actor=body.actor, role=body.role
     )
+    # 승인된 그룹 건에 연체 채권이 있으면 지급 전에 상계를 검토한다(22).
+    offset_ids = (
+        open_offset_reviews(session, [claim])
+        if body.decision == Decision.APPROVE
+        else []
+    )
     return ClaimDecisionResult(
         rebate_id=claim.rebate_id,
         status=claim.status,
         explanation_ids=explanation_ids,
+        offset_ids=offset_ids,
     )
 
 

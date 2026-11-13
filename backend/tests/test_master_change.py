@@ -213,7 +213,8 @@ def test_splitting_group_cancels_old_request_and_makes_new_one(client):
         json={"decision": "승인", "reason": "", **EXECUTIVE},
     )
     assert ok.status_code == 200
-    assert detail(client, "RB-00054")["status"] == "승인"
+    # 새 G1(D-011 · D-024)에도 연체 채권이 있어 승인 직후 상계검토로 넘어간다(22).
+    assert detail(client, "RB-00054")["status"] == "상계검토"
     assert detail(client, "RB-00180")["status"] == "전결대기"
 
 

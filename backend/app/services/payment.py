@@ -1,7 +1,8 @@
-"""지급 처리: 승인 → 지급지시 → (은행 회신 [모의]) → 지급완료 또는 지급보류.
+"""지급 처리: 승인 · 상계검토 → 지급지시 → (은행 회신 [모의]) → 지급완료 또는 지급보류.
 
 지급 지시는 재무만 낸다. 지급보류 건은 마지막 지시가 계좌오류였던 건만 다시 지시한다
-(증빙 부족으로 보류된 건이 소명을 건너뛰고 지급되지 않게). 금액은 22(상계) 전까지 장려금액.
+(증빙 부족으로 보류된 건이 소명을 건너뛰고 지급되지 않게). 상계검토 건은 상계 제안이 끝난 뒤에만
+(상계확정 · 재무반려 · 동의거절) 지시한다. 금액은 장려금액에서 확정된 상계액을 뺀 남은 금액(22).
 회신 기록 · 지시 상태 · 건 상태는 요청 트랜잭션 하나에서 함께 바뀐다. commit 하지 않는다.
 """
 
@@ -13,6 +14,7 @@ from app.models import BankReply, PaymentOrder, RebateClaim
 from app.models.enums import BankResult, ClaimStatus, Department, PaymentStatus
 from app.services.approval import InsufficientAuthorityError
 from app.services.claim_state import InvalidTransitionError, transition
+from app.services.offset import PAYABLE_AFTER, latest_offset, payable_krw
 
 RESULT_TO_PAYMENT_STATUS = {
     BankResult.SUCCESS: PaymentStatus.SUCCEEDED,
@@ -50,9 +52,17 @@ def order_payment(
         and last is not None
         and last.status == PaymentStatus.ACCOUNT_ERROR
     )
-    if claim.status != ClaimStatus.APPROVED and not retry:
+    # 상계검토 → 지급지시(차액 · 전액 지급)는 제안이 결정 · 동의까지 끝났을 때만이다.
+    if claim.status == ClaimStatus.OFFSET_REVIEW:
+        offset = latest_offset(session, rebate_id)
+        if offset is None or offset.status not in PAYABLE_AFTER:
+            raise InvalidTransitionError(
+                "상계 검토가 끝나지 않아 지급을 지시할 수 없습니다: "
+                f"{offset.status if offset else '제안 없음'} ({rebate_id})"
+            )
+    elif claim.status != ClaimStatus.APPROVED and not retry:
         raise InvalidTransitionError(
-            "지급 지시는 승인 건이나 계좌오류로 보류된 건만 할 수 있습니다: "
+            "지급 지시는 승인 · 상계검토 건이나 계좌오류로 보류된 건만 할 수 있습니다: "
             f"{claim.status} ({rebate_id})"
         )
     if role != Department.FINANCE:
@@ -62,7 +72,7 @@ def order_payment(
 
     order = PaymentOrder(
         rebate_id=rebate_id,
-        amount_krw=claim.rebate_amount_krw,
+        amount_krw=payable_krw(session, claim),
         status=PaymentStatus.AWAITING_REPLY,
         ordered_by=actor,
     )
