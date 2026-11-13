@@ -1,6 +1,6 @@
 /**
  * 장려금 건 상세 페이지.
- * 다음 행동, 원본 기록, 결재 경로(코드 계산)와 관련자 근거, 승인 요청, 지급, 이력을 보여 준다.
+ * 다음 행동, 원본 기록, 결재 경로(코드 계산)와 관련자 근거, 승인 요청, 상계 검토, 지급, 이력을 보여 준다.
  * 서버가 준 값만 보여 주고 판정을 다시 계산하지 않는다. AI 추천은 결정 대기 건에서 버튼으로 검토한다.
  * 행동 버튼은 건 상태만 보고 고른다. 역할 권한은 서버가 403 · 409 로 판단한다(14 결정).
  */
@@ -22,10 +22,11 @@ import DecisionForm from '../components/DecisionForm.tsx'
 import EventTimeline from '../components/EventTimeline.tsx'
 import ExplanationSection from '../components/ExplanationSection.tsx'
 import EvidenceTable from '../components/EvidenceTable.tsx'
+import OffsetSection from '../components/OffsetSection.tsx'
 import ProvenanceBadge from '../components/ProvenanceBadge.tsx'
 import StatusBadge from '../components/StatusBadge.tsx'
 import { useRole } from '../context/RoleContext.tsx'
-import { BankResult, ClaimStatus, PaymentStatus } from '../types/enums.ts'
+import { BankResult, ClaimStatus, OffsetStatus, PaymentStatus } from '../types/enums.ts'
 import type { ClaimDetail } from '../types/rebate.ts'
 import { formatDateTime, formatKrw } from '../utils/format.ts'
 
@@ -117,6 +118,8 @@ function ClaimDetailView({ rebateId }: { rebateId: string }) {
       </section>
 
       <ExplanationSection detail={detail} onChanged={() => setReloadKey((key) => key + 1)} />
+
+      <OffsetSection detail={detail} onChanged={() => setReloadKey((key) => key + 1)} />
 
       <section className="detail-section">
         <h3>
@@ -287,6 +290,14 @@ function NextAction({ detail, busy, error, run }: NextActionProps) {
   const { role, actor } = useRole()
   const { approval } = detail
   const lastPayment = detail.payments.at(-1)
+  const lastOffset = detail.offsets.at(-1)
+  // 상계검토 건은 제안이 결정 · 동의까지 끝나야 남은 금액을 지급한다(서버도 409 로 막는다).
+  const offsetFinished =
+    detail.status === ClaimStatus.OFFSET_REVIEW &&
+    lastOffset !== undefined &&
+    (lastOffset.status === OffsetStatus.SETTLED ||
+      lastOffset.status === OffsetStatus.FINANCE_REJECTED ||
+      lastOffset.status === OffsetStatus.CONSENT_REFUSED)
 
   let title: string
   let body: ReactNode
@@ -335,7 +346,11 @@ function NextAction({ detail, busy, error, run }: NextActionProps) {
         />
       </>
     )
-  } else if (detail.status === ClaimStatus.APPROVED || detail.status === ClaimStatus.ON_HOLD) {
+  } else if (
+    detail.status === ClaimStatus.APPROVED ||
+    detail.status === ClaimStatus.ON_HOLD ||
+    offsetFinished
+  ) {
     title = '지급 지시'
     body = (
       <div className="actions">
@@ -344,8 +359,11 @@ function NextAction({ detail, busy, error, run }: NextActionProps) {
           disabled={busy}
           onClick={() => run(() => orderPayment(detail.rebate_id, actor, role))}
         >
-          지급 지시
+          지급 지시 {formatKrw(detail.payable_krw)}
         </button>
+        {detail.payable_krw !== detail.rebate_amount_krw && (
+          <span className="muted">장려금 {formatKrw(detail.rebate_amount_krw)} 중 상계 뒤 남은 금액</span>
+        )}
       </div>
     )
   } else if (

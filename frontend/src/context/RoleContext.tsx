@@ -30,7 +30,7 @@ export const ROLE_PROFILES = [
     role: '재무',
     actor: '이재무',
     home: '/',
-    inbox: [ClaimStatus.APPROVED, ClaimStatus.PAYMENT_ORDERED],
+    inbox: [ClaimStatus.APPROVED, ClaimStatus.OFFSET_REVIEW, ClaimStatus.PAYMENT_ORDERED],
     dept: Department.FINANCE,
   },
   { role: '내부감사', actor: '최감사', home: '/tasks', inbox: [], dept: Department.AUDIT },

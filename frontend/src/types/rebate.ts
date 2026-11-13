@@ -7,6 +7,7 @@ import type { ApprovalSummary } from './approval.ts'
 import type { ApproverRole, ClaimStatus } from './enums.ts'
 import type { EventLogItem } from './eventLog.ts'
 import type { Explanation } from './explanation.ts'
+import type { OffsetProposal } from './offset.ts'
 import type { PaymentItem } from './payment.ts'
 import type { RelationEdge } from './relatedParty.ts'
 
@@ -74,4 +75,8 @@ export type ClaimDetail = {
   ai_review: AiReview | null
   /** 이 건의 소명 요청들(요청 ID 순). 요청마다 회신 · AI 주장 대조 · 사람 확인이 붙는다. */
   explanations: Explanation[]
+  /** 이 건의 상계 제안들(ID 순) [가정]. 그룹 건이 승인됐을 때 연체 채권이 있으면 생긴다. */
+  offsets: OffsetProposal[]
+  /** 지금 지급할 금액 = 장려금액 - 확정된 상계액 */
+  payable_krw: number
 }
