@@ -159,3 +159,12 @@ class AgencyConsent(StrEnum):
 
     CONSENT = "동의"
     REFUSE = "거절"
+
+
+class SalesAlternative(StrEnum):
+    """상계 제안에 대한 영업 의견의 대안 [가정]. 대리점 관계 부담을 보고 영업이 고른다."""
+
+    FULL_OFFSET = "전액 상계"
+    PARTIAL_OFFSET = "부분 상계"
+    # 상계하지 않고 장려금은 지급하되, 대리점에게 연체 채권 회수 약정을 받는다
+    PAY_WITH_PLAN = "지급 후 회수 약정"

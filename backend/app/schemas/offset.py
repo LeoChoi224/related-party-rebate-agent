@@ -9,7 +9,7 @@ from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.enums import AgencyConsent, Decision
+from app.models.enums import AgencyConsent, Decision, SalesAlternative
 from app.schemas.common import UtcDatetime
 
 
@@ -58,6 +58,11 @@ class OffsetOut(BaseModel):
     overdue_total_krw: int
     max_offset_krw: int
     status: str
+    sales_alternative: str | None
+    sales_amount_krw: int | None
+    sales_opinion: str | None
+    sales_by: str | None
+    sales_at: UtcDatetime | None
     ai_amount_krw: int | None
     ai_rationale: list[str]
     ai_counter_evidence: list[str]
@@ -71,6 +76,8 @@ class OffsetOut(BaseModel):
     decided_by: str | None
     decided_at: UtcDatetime | None
     agreed: bool | None
+    sales_followed: bool | None
+    collection_due_date: date | None
     agency_consent: str | None
     consent_provenance: str | None
     consented_at: UtcDatetime | None
@@ -80,12 +87,40 @@ class OffsetOut(BaseModel):
     adjustments: list[ARAdjustmentOut]
 
 
+class SalesOpinionRequest(BaseModel):
+    """영업 의견(23). 부분 상계면 권하는 상계액이 필요하고, 다른 대안이면 비워 둔다."""
+
+    alternative: SalesAlternative
+    amount_krw: int | None = None
+    opinion: str = Field(
+        min_length=1,
+        examples=["D-011 은 6월 신규 판촉 중이라 전액 상계 시 관계 부담 큼"],
+    )
+    actor: str = Field(min_length=1, examples=["김지원"])
+    role: str = Field(min_length=1, examples=["영업지원팀"])
+
+    @model_validator(mode="after")
+    def check_amount(self) -> "SalesOpinionRequest":
+        if not self.opinion.strip():
+            raise ValueError("영업 의견을 입력해야 합니다")
+        partial = self.alternative == SalesAlternative.PARTIAL_OFFSET
+        if partial and (self.amount_krw is None or self.amount_krw < 1):
+            raise ValueError("부분 상계는 1원 이상의 상계액을 입력해야 합니다")
+        if not partial and self.amount_krw is not None:
+            raise ValueError("상계액은 부분 상계일 때만 입력합니다")
+        return self
+
+
 class OffsetDecisionRequest(BaseModel):
-    """재무 결정. 승인이면 상계액이, 반려(상계하지 않음)면 사유가 필요하다."""
+    """재무 결정. 승인이면 상계액이, 반려(상계하지 않음)면 사유가 필요하다.
+
+    반려하면서 회수 약정 기한을 넣으면 "지급 후 회수 약정"이다(23).
+    """
 
     decision: Decision
     offset_amount_krw: int | None = None
     reason: str = ""
+    collection_due_date: date | None = None
     actor: str = Field(min_length=1, examples=["이재무"])
     role: str = Field(min_length=1, examples=["재무"])
 
@@ -96,6 +131,8 @@ class OffsetDecisionRequest(BaseModel):
                 raise ValueError(
                     "상계를 승인하려면 1원 이상의 상계액을 입력해야 합니다"
                 )
+            if self.collection_due_date is not None:
+                raise ValueError("회수 약정 기한은 상계하지 않을 때만 넣습니다")
         elif not self.reason.strip():
             raise ValueError("상계하지 않는 사유를 입력해야 합니다")
         return self

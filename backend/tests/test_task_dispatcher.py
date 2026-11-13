@@ -211,18 +211,21 @@ def client(tmp_path, api_engine):
 
 
 def test_api_lists_tasks_by_department(client):
-    """접수 뒤 정황 2건, G1 승인 뒤 재무 6건. dept 로 부서별로 거른다.
+    """접수 뒤 정황 2건, G1 승인 뒤 재무 6건 · 영업지원팀 3건. dept 로 부서별로 거른다.
 
     G1 은 승인 직후 상계검토로 넘어가(22) 지급 실행 3건이 닫히고 상계 검토 3건이 열린다.
+    상계는 대리점 관계에 부담이라 영업지원팀에 상계 영업 의견 3건이 함께 열린다(23).
     """
     all_tasks = client.get("/api/tasks").json()
-    assert len(all_tasks) == 8
+    assert len(all_tasks) == 11
     finance = client.get("/api/tasks", params={"dept": "재무"}).json()
     assert [(t["ref_id"], t["task_type"], t["status"]) for t in finance] == [
         (rebate_id, "지급 실행", "완료") for rebate_id in G1_CLAIMS
     ] + [(rebate_id, "상계 검토", "열림") for rebate_id in G1_CLAIMS]
     support = client.get("/api/tasks", params={"dept": "영업지원팀"}).json()
-    assert [t["ref_id"] for t in support] == CIRCUMSTANTIAL
+    assert [(t["ref_id"], t["task_type"]) for t in support] == [
+        (r, "소명 요청") for r in CIRCUMSTANTIAL
+    ] + [(r, "상계 영업 의견") for r in G1_CLAIMS]
     assert support[0]["detail"] == "D-034–D-041 대표자 일치(정황)"
 
 
@@ -263,8 +266,8 @@ def test_api_lists_tasks_by_several_statuses(client):
     client.patch("/api/tasks/1", json={"status": "완료"})
     client.patch("/api/tasks/2", json={"status": "진행"})
     todo = client.get("/api/tasks", params={"status": ["열림", "진행"]}).json()
-    assert [t["task_id"] for t in todo] == [2, 6, 7, 8]
-    assert len(client.get("/api/tasks").json()) == 8
+    assert [t["task_id"] for t in todo] == [2, 6, 7, 8, 9, 10, 11]
+    assert len(client.get("/api/tasks").json()) == 11
 
 
 def test_api_task_times_are_marked_utc(client):

@@ -3,7 +3,11 @@
 흐름(모두 요청 트랜잭션 안, commit 하지 않는다):
 1. 관련자 그룹 건이 승인되면(open_offset_reviews) 그룹 구성원의 90일 초과 연체 채권을 찾는다.
    남은 잔액이 있으면 상계 한도(코드)를 계산해 제안을 만들고 건을 승인 → 상계검토로 보낸다(재무 "상계 검토" 작업).
-2. 재무가 AI 추천 [주장] 을 참고해 상계액을 정하거나(동의대기) 상계하지 않기로 한다(재무반려).
+   영업지원팀에 "상계 영업 의견" 작업이 열린다(23, 부서 영향).
+2. 영업이 대리점 관계 부담을 보고 대안(전액 상계 · 부분 상계 · 지급 후 회수 약정)을 의견으로 낸다 [주장].
+   의견은 AI 추천의 사실과 재무 화면에 들어간다. 재무가 AI 추천 [주장] 과 영업 의견을 참고해
+   상계액을 정하거나(동의대기) 상계하지 않기로 한다(재무반려). 회수 약정 기한을 넣으면 지급 후 회수 약정이고,
+   재무에 "회수 약정 관리" 작업이 열린다.
 3. 대리점이 동의하면 [모의] 채권 잔액을 ARAdjustment 로 줄이고(원본 잔액은 그대로) 상계확정.
    장려금 전액을 상계했으면 건은 상계완료, 일부면 상계검토에 남아 재무가 차액을 지급 지시한다.
    대리점이 거절하거나 재무가 반려하면 재무가 전액을 지급 지시한다.
@@ -13,6 +17,7 @@
 """
 
 import logging
+from datetime import date
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -30,19 +35,24 @@ from app.models import (
     OffsetProposal,
     RebateClaim,
     RelatedGroup,
+    Task,
 )
 from app.models.enums import (
     AgencyConsent,
+    ApproverRole,
     ClaimStatus,
     Decision,
     Department,
     OffsetStatus,
     Provenance,
+    SalesAlternative,
+    TaskStatus,
 )
 from app.schemas.offset import ARAdjustmentOut, ARItemOut, OffsetOut
 from app.services.approval import InsufficientAuthorityError
 from app.services.claim_state import InvalidTransitionError, transition
 from app.services.intake import SYSTEM_ACTOR
+from app.services.task_dispatcher import create_task
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +68,12 @@ PAYABLE_AFTER = frozenset(
         OffsetStatus.CONSENT_REFUSED,
     }
 )
+
+# 영업 의견을 낼 수 있는 역할(23). 대리점 관계는 영업 조직이 책임진다.
+SALES_ROLES = frozenset({ApproverRole.SALES_SUPPORT, ApproverRole.SALES_EXECUTIVE})
+# 상태 전이가 아닌 부서 작업(23). 영업 의견 · 재무 결정이 나면 영업 작업은 자동으로 닫힌다.
+SALES_TASK = "상계 영업 의견"
+COLLECTION_TASK = "회수 약정 관리"
 
 
 class InvalidOffsetError(ValueError):
@@ -187,10 +203,35 @@ def open_offset_reviews(session: Session, claims: list[RebateClaim]) -> list[int
             ),
             payload={"offset_id": proposal.offset_id},
         )
+        # 상계는 대리점 관계에 부담이라 영업 의견을 받는다(23). 결정을 막지는 않는다.
+        create_task(
+            session,
+            dept=Department.SALES_SUPPORT,
+            task_type=SALES_TASK,
+            ref_id=claim.rebate_id,
+            detail=(
+                f"상계 제안 #{proposal.offset_id}: 상계 한도 {max_offset:,}원 — "
+                "대리점 관계 부담 의견 [가정]"
+            ),
+        )
         offset_ids.append(proposal.offset_id)
     if offset_ids:
         logger.info("상계 검토 제안 %d건 생성: %s", len(offset_ids), offset_ids)
     return offset_ids
+
+
+def _close_sales_task(session: Session, rebate_id: str) -> None:
+    """이 건의 열린 영업 의견 작업을 닫는다. 의견을 냈거나, 의견 없이 재무가 결정했을 때."""
+    tasks = session.scalars(
+        select(Task).where(
+            Task.ref_id == rebate_id,
+            Task.task_type == SALES_TASK,
+            Task.status != TaskStatus.DONE,
+        )
+    )
+    for task in tasks:
+        task.status = TaskStatus.DONE
+        task.closed_at = func.now()
 
 
 def _get(session: Session, offset_id: int) -> tuple[OffsetProposal, RebateClaim]:
@@ -255,7 +296,78 @@ def _facts(
         ],
         "그룹_연체_잔액_krw": proposal.overdue_total_krw,
         "max_offset_krw": proposal.max_offset_krw,
+        # 영업 의견은 영업 조직의 주장이다. 없으면 아직 받지 않은 것이다.
+        "영업_의견": (
+            {
+                "대안": proposal.sales_alternative,
+                "권하는_상계액_krw": proposal.sales_amount_krw,
+                "의견": proposal.sales_opinion,
+            }
+            if proposal.sales_alternative is not None
+            else "없음"
+        ),
     }
+
+
+def submit_sales_opinion(
+    session: Session,
+    offset_id: int,
+    *,
+    alternative: SalesAlternative,
+    amount_krw: int | None,
+    opinion: str,
+    actor: str,
+    role: str,
+) -> OffsetProposal:
+    """영업이 대리점 관계 부담을 보고 대안을 낸다(23). 재무 결정 전에만, 다시 내면 덮어쓴다."""
+    proposal, _ = _get(session, offset_id)
+    if proposal.status != OffsetStatus.AWAITING_FINANCE:
+        raise InvalidTransitionError(
+            f"재무 결정 전 제안에만 영업 의견을 낼 수 있습니다: {proposal.status} "
+            f"(상계 {offset_id})"
+        )
+    if role not in SALES_ROLES:
+        raise InsufficientAuthorityError(
+            f"{role} 은(는) 영업 의견을 낼 수 없습니다. 영업지원팀 · 영업임원만 냅니다 "
+            f"(상계 {offset_id})"
+        )
+    # 부분 상계가 한도와 같으면 전액 상계다. 이름과 금액이 어긋나지 않게 한도 미만만 받는다.
+    if alternative == SalesAlternative.PARTIAL_OFFSET and not (
+        amount_krw is not None and 1 <= amount_krw < proposal.max_offset_krw
+    ):
+        raise InvalidOffsetError(
+            f"부분 상계액 {amount_krw}원은 1원 이상 상계 한도 "
+            f"{proposal.max_offset_krw:,}원 미만이어야 합니다"
+        )
+    proposal.sales_alternative = alternative
+    proposal.sales_amount_krw = amount_krw
+    proposal.sales_opinion = opinion.strip()
+    proposal.sales_by = actor
+    proposal.sales_at = func.now()
+    _close_sales_task(session, proposal.rebate_id)
+    _log(
+        session,
+        proposal,
+        proposal.status,
+        actor=actor,
+        role=role,
+        reason=f"영업 의견 [주장]: {alternative} — {opinion.strip()}",
+    )
+    return proposal
+
+
+def _sales_followed(
+    proposal: OffsetProposal, approved: bool, collection_due_date: date | None
+) -> bool | None:
+    """재무 결정이 영업 대안과 같은지. 영업 의견이 없으면 비교하지 않는다."""
+    alternative = proposal.sales_alternative
+    if alternative is None:
+        return None
+    if alternative == SalesAlternative.FULL_OFFSET:
+        return approved and proposal.offset_amount_krw == proposal.max_offset_krw
+    if alternative == SalesAlternative.PARTIAL_OFFSET:
+        return approved and proposal.offset_amount_krw == proposal.sales_amount_krw
+    return not approved and collection_due_date is not None
 
 
 def recommend_offset(
@@ -297,8 +409,12 @@ def decide_offset(
     reason: str,
     actor: str,
     role: str,
+    collection_due_date: date | None = None,
 ) -> tuple[OffsetProposal, RebateClaim]:
-    """재무가 상계액을 정하거나(대리점 동의 대기) 상계하지 않기로 한다(전액 지급)."""
+    """재무가 상계액을 정하거나(대리점 동의 대기) 상계하지 않기로 한다(전액 지급).
+
+    상계하지 않으면서 회수 약정 기한을 넣으면 지급 후 회수 약정이고, 재무에 회수 약정 관리 작업이 열린다.
+    """
     proposal, claim = _get(session, offset_id)
     if proposal.status != OffsetStatus.AWAITING_FINANCE:
         raise InvalidTransitionError(
@@ -328,18 +444,28 @@ def decide_offset(
     # 상계하지 않기로 한 결정은 AI 가 0원을 권했을 때 일치다.
     if proposal.ai_amount_krw is not None:
         proposal.agreed = proposal.ai_amount_krw == (amount_krw if approved else 0)
-    _log(
-        session,
-        proposal,
-        before,
-        actor=actor,
-        role=role,
-        reason=(
-            f"상계 {amount_krw:,}원 승인 — 대리점 동의 요청"
-            if approved
-            else f"상계하지 않음 — {reason.strip()}"
-        ),
-    )
+    plan = None if approved else collection_due_date
+    proposal.collection_due_date = plan
+    proposal.sales_followed = _sales_followed(proposal, approved, plan)
+    # 의견 없이 결정하면 더 받을 의견이 없다. 영업 작업이 열린 채 남지 않게 닫는다.
+    _close_sales_task(session, proposal.rebate_id)
+    if approved:
+        why = f"상계 {amount_krw:,}원 승인 — 대리점 동의 요청"
+    elif plan is not None:
+        why = f"지급 후 회수 약정({plan}) — {reason.strip()}"
+        create_task(
+            session,
+            dept=Department.FINANCE,
+            task_type=COLLECTION_TASK,
+            ref_id=claim.rebate_id,
+            detail=(
+                f"상계 제안 #{offset_id}: 장려금 전액 지급, "
+                f"그룹 연체 채권 {plan} 까지 회수 약정 [가정]"
+            ),
+        )
+    else:
+        why = f"상계하지 않음 — {reason.strip()}"
+    _log(session, proposal, before, actor=actor, role=role, reason=why)
     return proposal, claim
 
 
@@ -448,6 +574,11 @@ def offset_out(session: Session, proposal: OffsetProposal) -> OffsetOut:
         overdue_total_krw=proposal.overdue_total_krw,
         max_offset_krw=proposal.max_offset_krw,
         status=proposal.status,
+        sales_alternative=proposal.sales_alternative,
+        sales_amount_krw=proposal.sales_amount_krw,
+        sales_opinion=proposal.sales_opinion,
+        sales_by=proposal.sales_by,
+        sales_at=proposal.sales_at,
         ai_amount_krw=proposal.ai_amount_krw,
         ai_rationale=proposal.ai_rationale,
         ai_counter_evidence=proposal.ai_counter_evidence,
@@ -461,6 +592,8 @@ def offset_out(session: Session, proposal: OffsetProposal) -> OffsetOut:
         decided_by=proposal.decided_by,
         decided_at=proposal.decided_at,
         agreed=proposal.agreed,
+        sales_followed=proposal.sales_followed,
+        collection_due_date=proposal.collection_due_date,
         agency_consent=proposal.agency_consent,
         consent_provenance=proposal.consent_provenance,
         consented_at=proposal.consented_at,
