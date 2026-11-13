@@ -137,10 +137,12 @@ flowchart TD
 
 ## 3. AI 워크플로우 (LangGraph)
 
-- 그래프는 3개다. 그래프 1회 실행 = 대상 건 1개 = thread 1개.
+- 그래프는 3개다. 그래프 1회 실행 = 대상 1개 = thread 1개. thread_id 는 `그래프이름:대상`(16 · 17).
+- `claim_review` 의 대상은 **검토 단위**다: 전결 건 하나, 또는 상신 건이면 승인 요청 하나(G1 은 결정 한 번으로 3건이 함께 바뀐다).
 - `[[ ]]` 모양은 **interrupt**다. 그래프가 여기서 멈추고, 사람 결정이나 외부 회신이 오면 이어서 실행된다.
-- **상태를 바꾸는 노드는 `apply_*`뿐이다.** 모두 사람 결정 뒤에 있다.
+- **건 상태는 사람 결정 뒤에만 바뀐다.** `claim_review` 는 결정 API 가 09 서비스로 권한 · 상태를 검사하고 바꾼 뒤, 통과했을 때만 재개한다. LangGraph 는 재개 값을 받는 순간 저장해서, 재개 뒤 노드가 403 · 409 로 실패하면 다음 재개가 그 틀린 값으로 돌기 때문이다(17 에서 시험으로 확인). 그래서 `record_decision` 은 추천 행에 결정 · 일치 여부만 적는다.
 - AI가 결재 단계를 최소 결재권자보다 낮게 판단하면 `raise_authority`가 코드 값으로 고정하고 불일치를 기록한다.
+- `wait_external` · `apply_reply` 는 22(대리점 동의)에서 더한다. 은행 회신은 11 의 API 로 처리한다.
 
 ```mermaid
 flowchart TD
@@ -149,15 +151,16 @@ flowchart TD
     N1 --> N2["compute_rules · 코드<br/>관련자 판정 · 그룹 합산<br/>최소 결재권자"]
     N2 --> N3["assess · AI<br/>추천: 전결 · 상신 · 소명 먼저 · 상계 검토<br/>근거 · 반대 근거 · 확신도"]
     N3 --> N4{"verify · 가드<br/>숫자가 계산값과 같은가<br/>결재 단계가 최소 이상인가"}
-    N4 -->|"숫자 불일치 · 1회차"| N3
-    N4 -->|"2회 실패"| N5["fallback<br/>AI 추천 없이 규정 결과만"]
+    N4 -->|"숫자 · 형식 불일치 · 1회차"| N3
+    N4 -->|"2회 실패 · 모델 없음"| N5["fallback<br/>AI 추천 없이 규정 결과만"]
     N4 -->|"결재 단계가 낮음"| N6["raise_authority<br/>코드 값으로 고정 · 불일치 기록"]
-    N4 -->|통과| N7
-    N5 --> N7
-    N6 --> N7
+    N4 -->|통과| NS
+    N5 --> NS
+    N6 --> NS
+    NS["save_recommendation<br/>AI_RECOMMENDATION 저장"] --> N7
     N7[["human_decision · interrupt<br/>AI 추천과 함께 결정 요청"]]
-    N7 -->|"사람 결정 도착"| N8["apply_decision<br/>DB 상태 변경 · 작업 생성<br/>추천 일치 여부 기록"]
-    N8 --> N9{"후속 처리"}
+    N7 -->|"결정 API 가 서비스로 상태 변경 뒤 재개"| N8["record_decision<br/>결정 · 추천 일치 여부 기록"]
+    N8 --> N9{"후속 처리 (22)"}
     N9 -->|"지급 · 상계"| N10[["wait_external · interrupt<br/>은행 회신 · 대리점 동의"]]
     N10 --> N11["apply_reply<br/>지급완료 · 상계완료 · 지급보류"]
     N11 --> END1(["끝"])
@@ -204,7 +207,7 @@ flowchart TD
 - `RELATION_EDGE` 는 1개 이상 일치한 쌍만 저장한다(원본 기준 4쌍: 관련자 3 · 정황 1). `agency_a` 가 작은 ID 다. `matched_attrs` 는 일치한 속성마다 값과 양쪽 근거 행(`IDENTITY_ATTR.source_ref`)을 담는다.
 - **06 `feat/approval-authority` 는 `REBATE_CLAIM` 에 `min_authority` · `group_id` · `group_sum_krw` 를 더한다.** 셋 다 비어 있을 수 있고, 비어 있으면 아직 판정 전이다. 시더는 채우지 않는다. 대상월 하나를 판정하는 함수가 채우며, 6월분은 08 접수 때 채운다(1~5월 위반은 감사 24 에서 같은 함수로 계산).
 - 한도 판정: 대상월(`period_ym`) 기준, 지금 버전 그룹 단위(그룹이 없으면 대리점 혼자)로 반려 건을 뺀 장려금을 합산한다. 2,000,000원 이하면 영업지원팀, 넘으면 영업임원. 단독 대리점도 `group_sum_krw` 에 자기 금액을 넣고 `group_id` 는 비운다. 구성 건은 같은 `group_id` · 같은 대상월로 조회하며 따로 저장하지 않는다.
-- **09 `feat/approval-request` 는 `APPROVAL_REQUEST` · `APPROVAL_ITEM` 을 더한다.** 08 접수 때 상신대기로 간 건을 판정 단위마다 묶어 요청 1건을 같은 트랜잭션에서 만든다(원본 기준 G1 요청 1건 · 포함 3건). `rec_id` 는 `AI_RECOMMENDATION` 과 함께 17 에서 더한다. 그룹 근거는 복사하지 않고 `group_id` 로 `RELATION_EDGE` 를 찾는다.
+- **09 `feat/approval-request` 는 `APPROVAL_REQUEST` · `APPROVAL_ITEM` 을 더한다.** 08 접수 때 상신대기로 간 건을 판정 단위마다 묶어 요청 1건을 같은 트랜잭션에서 만든다(원본 기준 G1 요청 1건 · 포함 3건). `rec_id` 컬럼은 두지 않는다. 17 의 `AI_RECOMMENDATION` 이 `target_type`(`approval_request`) · `target_id` 로 요청을 가리킨다. 그룹 근거는 복사하지 않고 `group_id` 로 `RELATION_EDGE` 를 찾는다.
 - 결재 권한: 결정하는 역할이 요구 역할(요청의 `approver_role`, 전결 건은 `min_authority`) **이상** 이어야 한다(`ApproverRole` 순서로 비교, 결재권자가 아닌 역할은 항상 부족 → 403). 반려는 사유 필수(422). 이미 결정된 요청 · 건은 상태 머신이 막는다(409). 상신대기 건은 전결 결정 길로 결정할 수 없다(요청 기록 없이 승인되는 것을 막음). 결정자 이름 · 역할은 시연용으로 요청 본문에 담는다(실제 시스템이면 로그인 토큰에서 꺼낸다).
 - **10 `feat/task-dispatcher` 는 `TASK` 를 더한다.** 작업은 상태 머신의 전이 함수 안에서 규칙표로 자동 생성된다(상태를 바꾸는 길이 하나라 빠지는 작업이 없다). 규칙표 키는 (이전 상태, 이후 상태)이고 이전 상태 조건이 없는 규칙은 "아무거나"다: 승인 → 재무 지급 실행, 소명대기 → 영업지원팀 소명 요청, 소명대기 → 지급보류 → 영업지원팀 추가 소명 요청, 지급지시 → 지급보류 → 재무 지급 계좌 확인, 상계검토 → 재무 상계 검토, 재검토필요 → 영업지원팀 재판정. 결재 대기(전결대기 · 상신대기)는 작업이 아니라 처리함에서 다룬다.
 - 건이 어떤 상태를 떠나면 그 상태(`trigger_status`)가 만든 열린 작업은 자동 완료된다(예: 승인 → 지급지시 이면 지급 실행 작업이 닫힘). 사람은 작업 API 로 열림 → 진행 → 완료를 표시하고, 완료는 다시 열 수 없다. 작업 상태 변경은 이력(`EVENT_LOG`)에 남기지 않는다. 상태 전이가 아닌 작업(접수 때 정황 소명 요청 · 24 의 감사 사후 검토)은 `trigger_status` · `created_by_event` 가 비어 있다. 부서 이름은 역할 이름과 같다.
@@ -384,7 +387,7 @@ erDiagram
   AI_RECOMMENDATION {
     int rec_id PK
     string graph "claim_review 등"
-    string thread_id "대상 건 ID"
+    string thread_id "그래프이름:대상"
     string target_type
     string target_id
     string recommendation

@@ -4,6 +4,7 @@ from datetime import date
 
 from pydantic import BaseModel
 
+from app.schemas.ai_recommendation import AiReviewOut
 from app.schemas.approval import ApprovalSummary
 from app.schemas.event_log import EventLogOut
 from app.schemas.payment import PaymentOut
@@ -75,3 +76,5 @@ class ClaimDetail(BaseModel):
     approval: ApprovalSummary | None
     payments: list[PaymentOut]
     events: list[EventLogOut]
+    # 이 건의 검토 단위(상신 건이면 승인 요청)에서 가장 최근 AI 추천 [주장]. 검토 전이면 없음.
+    ai_review: AiReviewOut | None

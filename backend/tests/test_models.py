@@ -75,6 +75,7 @@ def test_create_all_makes_erd_tables(db_engine):
     """create_all 하면 지금까지 만든 ERD 표가 이름 그대로 모두 생긴다."""
     assert sorted(inspect(db_engine).get_table_names()) == [
         "agency",
+        "ai_recommendation",
         "approval_item",
         "approval_request",
         "ar_item",

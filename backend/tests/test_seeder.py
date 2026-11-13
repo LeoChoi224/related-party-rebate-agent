@@ -34,6 +34,7 @@ EXPECTED_COUNTS = {
     "approval_request": 0,
     "approval_item": 0,
     "task": 0,
+    "ai_recommendation": 0,
     "payment_order": 0,
     "bank_reply": 0,
 }
