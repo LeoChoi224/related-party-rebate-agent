@@ -34,6 +34,8 @@ EXPECTED_COUNTS = {
     "approval_request": 0,
     "approval_item": 0,
     "task": 0,
+    "payment_order": 0,
+    "bank_reply": 0,
 }
 G1 = ("D-011", "D-024", "D-037")
 

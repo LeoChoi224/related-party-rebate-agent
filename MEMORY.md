@@ -1,24 +1,24 @@
 # MEMORY — W07 판매장려금 통제 데스크
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
 ## 지금 상태
 
 - 업무 **W07 관련 거래처와 판매장려금 지급**. 설계 `docs/W07_설계안.md` v0.2 · `docs/architecture.md` v0.2(아키텍처 · 페이지 흐름 · AI 워크플로 · ERD).
 - 프로젝트 폴더 `~/LeoData/MyCode/rebate-agent` (11/11 `삼일PwC_프로젝트폴더`에서 이름 변경. 기록 훅은 폴더 경로를 쓰지 않아 영향 없음).
 - 원격: `origin` = Axhub 저장소(배포용, `main` push 시 자동 배포), `github` = GitHub `LeoChoi224/related-party-rebate-agent`(퍼블릭, PR 용). 라벨: GitHub 기본 10개 + `chore`.
-- axhub CLI v0.63.0(`~/.axhub/bin/axhub`, PATH 미등록) · 플러그인 axhub@axhub 1.43.0 · 로그인(leochoi224@gmail.com). lounge 테넌트 `c7a0a6fe-86c6-45f4-adc2-3ab7bd19ea36`.
+- axhub CLI v0.63.0(`~/.axhub/bin/axhub`, PATH 미등록) · 플러그인 axhub@axhub 1.44.0 · 로그인(leochoi224@gmail.com). lounge 테넌트 `c7a0a6fe-86c6-45f4-adc2-3ab7bd19ea36`.
 - AXHub 앱 `related-party-rebate-agent`(Docker, 앱 ID `6a0fd4bd-b4cf-45eb-865c-dff1dfd8047a`), 주소 https://related-party-rebate-agent-h6nw.axhub.app . 배포본 = `750dfd5`(01 최소 앱 + 02 배포 설정). **절전 중**(11/11 20:20 KST부터).
-- GitHub: PR #1(뼈대) ~ #9(09 상신 결재) 머지됨. `github/main` = `5e6edc2`.
-- 로컬: `main` = `5e6edc2`, 작업 브랜치 `feat/task-dispatcher`(10). 로컬 `main` 의 upstream 은 `origin/main`(Axhub, `750dfd5`)이라 GitHub 머지분은 반드시 `git pull github main` 으로 받는다.
-- 로드맵 완료: 00 ~ 09. 04 = SQLite 원본 5개 표 · 시작 시 초기화 · `POST /api/demo/reset`. 05 = 관련자 판정(표 4개, 시더가 버전 1 저장). 06 = 한도 판정(`assess_period(session, period_ym)`). 07 = 상태 14개 · 전이표 · `transition`(이력 `event_log`, `docs/architecture.md` 5장 상태도). 08 = `POST /api/claims/intake?period=`(요청 = 트랜잭션, 전이 오류 409 처리기). 09 = 승인 요청(접수 때 생성) · `POST /api/approvals/{id}/decision` · `POST /api/claims/{rebate_id}/decision` · 권한 부족 403(pytest 180개, 초기화 13개 표). 로컬 Docker 빌드는 미확인.
-- 10 `feat/task-dispatcher` Step 1~4 끝(부서 · 작업 상태 값과 `task` 표 → `services/task_dispatcher.py` 규칙표 · `transition` 끝에서 배정 · 떠나는 상태 작업 자동 완료 · 접수 때 정황 2건 → `GET /api/tasks?dept=&status=` · `PATCH /api/tasks/{id}`). 11/13 Step 4 반영 · 검증(ruff 통과, pytest 207개, uvicorn 으로 정황 2 · 재무 3 · 진행 · 완료 200 · 재오픈 409 · `dept=영업` 422 확인), **커밋 전**. 초기화 행 수 14개 표.
+- GitHub: PR #1(뼈대) ~ #10(10 부서별 작업) 머지됨. `github/main` = `10d49fd`.
+- 로컬: `main` = `10d49fd`, 작업 브랜치 `feat/payment-mock`(11). 로컬 `main` 의 upstream 은 `origin/main`(Axhub, `750dfd5`)이라 GitHub 머지분은 반드시 `git pull github main` 으로 받는다.
+- 로드맵 완료: 00 ~ 10. 04 = SQLite 원본 5개 표 · 시작 시 초기화 · `POST /api/demo/reset`. 05 = 관련자 판정(표 4개, 시더가 버전 1 저장). 06 = 한도 판정(`assess_period(session, period_ym)`). 07 = 상태 14개 · 전이표 · `transition`(이력 `event_log`, `docs/architecture.md` 5장 상태도). 08 = `POST /api/claims/intake?period=`(요청 = 트랜잭션, 전이 오류 409 처리기). 09 = 승인 요청(접수 때 생성) · `POST /api/approvals/{id}/decision` · `POST /api/claims/{rebate_id}/decision` · 권한 부족 403. 10 = 작업 규칙표(`transition` 끝에서 배정 · 떠나는 상태 작업 자동 완료) · 접수 때 정황 2건 · `GET /api/tasks` · `PATCH /api/tasks/{id}`. 로컬 Docker 빌드는 미확인.
+- 11 `feat/payment-mock` Step 1~4 끝(지급 값 · 표 2개(`bank_reply.payment_id` 유일) → `mocks/bank.py` · `services/payment.py` → `POST /api/claims/{rebate_id}/payment-order` · `POST /api/payments/{payment_id}/bank-reply`). 11/13 Step 4 반영 · 검증(ruff 통과, pytest 228개, uvicorn 으로 승인 전 409 · 영업임원 403 · 지시 200 · 계좌오류 → 지급보류 · 계좌 확인 작업 열림 · 재지시 · 성공 → 지급완료 · 재회신 409 확인), **커밋 전**. 초기화 행 수 16개 표. 시나리오 1(정상) 흐름이 API 로 끝까지 이어짐.
 - 확인 숫자: agency 50 · identity_attr 182 · deposit 32 · ar_item 146 · rebate_claim 240, G1 6월 합산 3,888,097, 상태 지급완료 196 · 미접수 40 · 반려 4. 05: 일치 쌍 4(관련자 3 · 정황 1), 그룹 G1 하나. 06: 달마다 40건 · 판정 단위 38(단독 35 + G1), 한도 초과는 매달 G1 뿐(1~5월 4,870,186 · 4,540,341 · 4,055,114 · 4,267,112 · 4,505,596 = 22,238,349), 6월 영업임원 3 · 영업지원팀 37, 단독 최대 1,822,391(4월), 개별 최대 1,867,253.
 
 ## 다음에 할 일
 
-- 10 커밋 · 푸시 · PR (사용자, Git 명세서 11/13 전달: 루트 이동 → 코드 커밋 + 문서 커밋 + 메모리 커밋 → `git push -u github feat/task-dispatcher`). 머지 뒤 `git switch main` → `git pull github main`.
-- 로드맵 11 `feat/payment-mock`(지급 지시 → 모의 은행 회신 성공 / 계좌 오류 → 지급완료 또는 지급보류, 화면에 `[모의]`. 완료 기준: 회신에 따라 장려금 건 상태가 바뀐다. ERD `PAYMENT_ORDER` · `BANK_REPLY`. 승인 → 지급지시 때 재무 지급 실행 작업이 자동 완료되는지도 확인) Step 1.
+- 11 커밋 · 푸시 · PR (사용자, Git 명세서 11/13 전달: 루트 이동 → 코드 커밋 + 문서 커밋 + 메모리 커밋 → `git push -u github feat/payment-mock`). 머지 뒤 `git switch main` → `git pull github main`.
+- 로드맵 12 `feat/ui-shell-roles`(AppLayout · RoleSwitcher · RoleContext · `api/client.ts` · TS 타입을 백엔드 schemas 와 맞춤) Step 1. 첫 프론트 작업 — `frontend/package.json` · 설치 버전 확인부터. 역할 선택이 09 · 11 의 `actor` · `role` 본문, 10 의 `?dept=` 를 채운다. 일정상 목요일 마감 점검(정상 시나리오 화면 완주) 대비 늦음 → 13 · 14 우선.
 - 배포 전 `axhub deploy check` 로 원본 COPY 가 들어간 Dockerfile 확인.
 - 제출 전 앱 `wake` 후 심사 기간 내내 켜 두기.
 
@@ -55,6 +55,8 @@ Last updated: 2026-11-12
 - 09 규칙: 권한 = `ApproverRole` 순서로 "요구 역할 이상", 결재권자 아닌 역할은 항상 부족 → 전용 예외 403 처리기. 반려 사유 필수는 Pydantic 스키마(422), 승인 사유는 선택(비면 역할 이름으로 이력 이유). 재결정은 상태 머신 409. 상신대기 건은 전결 결정 길로 결정 불가(409, 요청 기록 없는 승인 방지). `rec_id` 는 17, 승인 뒤 단계는 11 · 22, 반려 뒤 소명은 21, 상세 · 목록 조회는 13 · 14(11/13).
 - 10 결정(사용자 "기본안대로"): ① 작업은 07 `transition` 안에서 규칙표로 자동 생성(상태 바꾸는 길이 하나라 누락 없음, 상태 머신 → 작업 모듈 의존 하나 늘어남). ② 건이 그 상태를 떠나면 `trigger_status` 가 같은 열린 작업 자동 완료 + 사람은 작업 API 로 진행 · 완료. ③ 작업 API(`GET /api/tasks?dept=&status=`, `PATCH /api/tasks/{id}`)와 접수 때 정황 소명 작업(D-034 · D-041 2건)도 10 에(11/13).
 - 10 규칙표 (이전, 이후) → 부서 · 작업: (*, 승인) 재무 지급 실행 · (*, 소명대기) 영업지원팀 소명 요청 · (소명대기, 지급보류) 영업지원팀 추가 소명 요청 · (지급지시, 지급보류) 재무 지급 계좌 확인 · (*, 상계검토) 재무 상계 검토 · (*, 재검토필요) 영업지원팀 재판정. 결재 대기는 작업 아님(처리함). 부서 이름 = 역할 이름(재무 · 영업지원팀 · 내부감사). 작업 상태 열림 → 진행 → 완료(열림 → 완료 허용, 완료 재오픈 불가 409). 작업 상태 변경은 이력에 안 남김. 감사 사후 검토 작업은 24(11/13).
+- 11 결정(사용자 "기본안대로"): ① 은행 회신은 시연이 결과를 골라 넣는 API(`mocks/bank.py` 는 출처 `모의` 로 기록만, 처리자 "은행" · 역할 "모의 외부") ② 지급 계좌 컬럼 없음(설계안 2장, 수취계좌 원본에 없음) ③ 지시는 건 아래(`/claims/{id}/payment-order`), 회신은 지급 아래(`/payments/{id}/bank-reply`)(11/13).
+- 11 규칙: 지급 지시는 재무만(결재권과 다른 권한, 영업임원도 403). 승인 건 또는 마지막 지시(`payment_id` 가장 큰 것 — 시각은 초 단위라 겹침)가 계좌오류인 지급보류 건만(409, 증빙 부족 보류 건이 소명을 건너뛰는 구멍 차단). 지시 하나에 회신 하나 — 서비스 검사 409 + DB `unique`(서비스 우회 대비). 계좌오류 뒤 재지시는 새 지시. 금액은 22 전까지 장려금액. 은행 회신 결과 enum 에 회신대기 없음(422)(11/13).
 - 파이썬 의존성은 leo-dev 설치 버전으로 고정(fastapi 0.141.1, uvicorn 0.52.1) — 로컬과 Docker 동일. 테스트 도구는 `requirements-dev.txt` 로 분리.
 - GitHub 이슈는 쓰지 않고 로드맵 번호 · 브랜치 이름으로 관리(1인 · 4일 일정). 저장소 퍼블릭 공개는 주최 측 허용(11/11).
 - 루트 `.gitignore`(기록 키 3줄)는 대회 규칙상 수정 금지 → 앱용 ignore 는 폴더별 파일, axhub 로컬 상태 `.axhub/` 는 `.git/info/exclude`.

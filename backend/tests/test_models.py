@@ -8,13 +8,24 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import make_engine
-from app.models import Agency, ARItem, Base, Deposit, IdentityAttribute, RebateClaim
+from app.models import (
+    Agency,
+    ARItem,
+    BankReply,
+    Base,
+    Deposit,
+    IdentityAttribute,
+    PaymentOrder,
+    RebateClaim,
+)
 from app.models.enums import (
     ApproverRole,
+    BankResult,
     ClaimStatus,
     Decision,
     Department,
     IdentityAttrType,
+    PaymentStatus,
     Provenance,
     TaskStatus,
 )
@@ -67,11 +78,13 @@ def test_create_all_makes_erd_tables(db_engine):
         "approval_item",
         "approval_request",
         "ar_item",
+        "bank_reply",
         "deposit",
         "event_log",
         "group_member",
         "group_version",
         "identity_attr",
+        "payment_order",
         "rebate_claim",
         "related_group",
         "relation_edge",
@@ -100,6 +113,8 @@ def test_create_all_makes_erd_tables(db_engine):
         ("task", "created_by_event", True),
         ("task", "closed_at", True),
         ("task", "detail", False),
+        ("payment_order", "amount_krw", False),
+        ("bank_reply", "provenance", False),
         ("identity_attr", "valid_to", True),
         ("ar_item", "outstanding_krw", False),
         ("rebate_claim", "status", False),
@@ -135,6 +150,8 @@ def test_foreign_keys_point_to_parent_tables(db_engine):
         "rebate_id": "rebate_claim",
     }
     assert fk_map("task") == {"created_by_event": "event_log"}
+    assert fk_map("payment_order") == {"rebate_id": "rebate_claim"}
+    assert fk_map("bank_reply") == {"payment_id": "payment_order"}
 
 
 def test_rows_round_trip_with_korean_values(db_engine):
@@ -216,6 +233,29 @@ def test_deposit_for_unknown_receivable_is_rejected(db_engine):
         )
 
 
+def test_bank_reply_is_one_per_payment_order(db_engine):
+    """지시 하나에 회신은 하나다. 같은 지시에 두 번째 회신을 넣으면 DB 가 막는다."""
+    with Session(db_engine) as session, session.begin():
+        session.add(make_agency())
+        session.flush()
+        session.add(make_claim())
+        session.flush()
+        order = PaymentOrder(
+            rebate_id="RB-00001", amount_krw=300_000, status="회신대기", ordered_by="t"
+        )
+        session.add(order)
+        session.flush()
+        session.add(
+            BankReply(payment_id=order.payment_id, result="계좌오류", provenance="모의")
+        )
+    with (
+        pytest.raises(IntegrityError),
+        Session(db_engine) as session,
+        session.begin(),
+    ):
+        session.add(BankReply(payment_id=1, result="성공", provenance="모의"))
+
+
 def test_enum_values_match_source_labels():
     """코드 값은 원본·화면에 쓰는 한글 표기와 같다."""
     assert [s.value for s in ClaimStatus] == [
@@ -241,6 +281,9 @@ def test_enum_values_match_source_labels():
     # 부서는 역할 화면에서 그대로 거를 수 있게 역할 이름과 같다.
     assert [d.value for d in Department] == ["재무", "영업지원팀", "내부감사"]
     assert [s.value for s in TaskStatus] == ["열림", "진행", "완료"]
+    assert [s.value for s in PaymentStatus] == ["회신대기", "성공", "계좌오류"]
+    # 은행 회신 결과에는 회신대기가 없다.
+    assert [r.value for r in BankResult] == ["성공", "계좌오류"]
     assert {a.value for a in IdentityAttrType} == {
         "대표자",
         "주소",

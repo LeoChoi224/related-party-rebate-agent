@@ -208,6 +208,7 @@ flowchart TD
 - 결재 권한: 결정하는 역할이 요구 역할(요청의 `approver_role`, 전결 건은 `min_authority`) **이상** 이어야 한다(`ApproverRole` 순서로 비교, 결재권자가 아닌 역할은 항상 부족 → 403). 반려는 사유 필수(422). 이미 결정된 요청 · 건은 상태 머신이 막는다(409). 상신대기 건은 전결 결정 길로 결정할 수 없다(요청 기록 없이 승인되는 것을 막음). 결정자 이름 · 역할은 시연용으로 요청 본문에 담는다(실제 시스템이면 로그인 토큰에서 꺼낸다).
 - **10 `feat/task-dispatcher` 는 `TASK` 를 더한다.** 작업은 상태 머신의 전이 함수 안에서 규칙표로 자동 생성된다(상태를 바꾸는 길이 하나라 빠지는 작업이 없다). 규칙표 키는 (이전 상태, 이후 상태)이고 이전 상태 조건이 없는 규칙은 "아무거나"다: 승인 → 재무 지급 실행, 소명대기 → 영업지원팀 소명 요청, 소명대기 → 지급보류 → 영업지원팀 추가 소명 요청, 지급지시 → 지급보류 → 재무 지급 계좌 확인, 상계검토 → 재무 상계 검토, 재검토필요 → 영업지원팀 재판정. 결재 대기(전결대기 · 상신대기)는 작업이 아니라 처리함에서 다룬다.
 - 건이 어떤 상태를 떠나면 그 상태(`trigger_status`)가 만든 열린 작업은 자동 완료된다(예: 승인 → 지급지시 이면 지급 실행 작업이 닫힘). 사람은 작업 API 로 열림 → 진행 → 완료를 표시하고, 완료는 다시 열 수 없다. 작업 상태 변경은 이력(`EVENT_LOG`)에 남기지 않는다. 상태 전이가 아닌 작업(접수 때 정황 소명 요청 · 24 의 감사 사후 검토)은 `trigger_status` · `created_by_event` 가 비어 있다. 부서 이름은 역할 이름과 같다.
+- **11 `feat/payment-mock` 은 `PAYMENT_ORDER` · `BANK_REPLY` 를 더한다.** 지급 지시는 재무만(403), 승인 건 또는 마지막 지시가 계좌오류였던 지급보류 건만 된다(409 — 증빙 부족으로 보류된 건이 지급되는 것을 막음). 은행 회신은 시연이 결과를 골라 넣는 API 이고 출처는 `모의`, 지시 하나에 회신 하나(두 번째는 409). 성공 → 지급완료, 계좌오류 → 지급보류(재무 계좌 확인 작업) → 다시 지시하면 새 지시를 만든다. 실제 수취계좌는 원본에 없어(설계안 2장) 지급 계좌 컬럼은 두지 않는다. 금액은 22 전까지 장려금액이다.
 
 ```mermaid
 erDiagram
@@ -368,13 +369,14 @@ erDiagram
   PAYMENT_ORDER {
     int payment_id PK
     string rebate_id FK
-    int amount_krw "상계 후 금액"
-    string status
+    int amount_krw "상계 후 금액 · 22 전까지는 장려금액"
+    string status "회신대기 성공 계좌오류"
+    string ordered_by
     datetime ordered_at
   }
   BANK_REPLY {
     int reply_id PK
-    int payment_id FK
+    int payment_id FK "지시 하나에 회신 하나"
     string result "성공 계좌오류"
     string provenance "모의"
     datetime replied_at
