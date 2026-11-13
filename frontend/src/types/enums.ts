@@ -130,3 +130,12 @@ export const AgencyConsent = {
   REFUSE: '거절',
 } as const
 export type AgencyConsent = (typeof AgencyConsent)[keyof typeof AgencyConsent]
+
+/** 상계 제안에 대한 영업 의견의 대안 [가정]. 대리점 관계 부담을 보고 영업이 고른다. */
+export const SalesAlternative = {
+  FULL_OFFSET: '전액 상계',
+  PARTIAL_OFFSET: '부분 상계',
+  /** 상계하지 않고 지급하되, 연체 채권 회수 약정을 받는다 */
+  PAY_WITH_PLAN: '지급 후 회수 약정',
+} as const
+export type SalesAlternative = (typeof SalesAlternative)[keyof typeof SalesAlternative]

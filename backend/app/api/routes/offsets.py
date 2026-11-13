@@ -1,4 +1,4 @@
-"""상계 API(필수 확장) [가정]: AI 상계액 추천, 재무 결정, 대리점 동의 [모의].
+"""상계 API(필수 확장) [가정]: 영업 의견(23), AI 상계액 추천, 재무 결정, 대리점 동의 [모의].
 
 상계 제안은 관련자 그룹 건이 승인될 때 결정 API 가 만든다(claims · approvals 라우터).
 조회는 건 상세(GET /claims/{id})의 offsets 칸에서 한다.
@@ -13,6 +13,7 @@ from app.schemas.offset import (
     OffsetDecisionRequest,
     OffsetOut,
     OffsetResult,
+    SalesOpinionRequest,
 )
 from app.services.offset import (
     InvalidOffsetError,
@@ -21,6 +22,7 @@ from app.services.offset import (
     offset_out,
     payable_krw,
     recommend_offset,
+    submit_sales_opinion,
 )
 
 router = APIRouter(prefix="/offsets", tags=["offsets"])
@@ -32,6 +34,36 @@ def _result(session, proposal, claim) -> OffsetResult:
         claim_status=claim.status,
         payable_krw=payable_krw(session, claim),
     )
+
+
+@router.post(
+    "/{offset_id}/sales-opinion",
+    responses={
+        403: {"description": "영업지원팀 · 영업임원이 아님"},
+        404: {"description": "상계 제안이 없음"},
+        409: {"description": "재무가 이미 결정한 제안"},
+        422: {"description": "부분 상계액이 없거나 한도 밖, 의견이 비어 있음"},
+    },
+)
+def sales_opinion(
+    offset_id: int, body: SalesOpinionRequest, session: SessionDep
+) -> OffsetOut:
+    """영업이 대리점 관계 부담을 보고 대안(전액 · 부분 상계 · 지급 후 회수 약정)을 낸다."""
+    try:
+        proposal = submit_sales_opinion(
+            session,
+            offset_id,
+            alternative=body.alternative,
+            amount_krw=body.amount_krw,
+            opinion=body.opinion,
+            actor=body.actor,
+            role=body.role,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except InvalidOffsetError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    return offset_out(session, proposal)
 
 
 @router.post(
@@ -72,6 +104,7 @@ def decide(
             reason=body.reason,
             actor=body.actor,
             role=body.role,
+            collection_due_date=body.collection_due_date,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e

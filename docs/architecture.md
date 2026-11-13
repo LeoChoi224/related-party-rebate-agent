@@ -219,7 +219,8 @@ flowchart TD
 - **18 `feat/explanation-review-graph` 는 `EXPLANATION_REQUEST` · `EXPLANATION_REPLY` · `EXPLANATION_CHECK` 를 더한다.** 요청은 반려 · 지급보류 건에만 만들 수 있고(상신대기 G1 건 하나만 소명대기로 빠지면 3건이 한 묶음인 승인 요청과 어긋난다) 건은 소명대기가 된다. 요청 하나에 회신은 하나(`unique`)이고, 보완 회신은 새 요청으로 받는다. AI 판단(증빙 충분 · 부족)은 `AI_RECOMMENDATION`(승인 · 반려 · 소명 먼저)과 의미가 달라 `EXPLANATION_REPLY` 에 직접 두며, 그래서 `rec_id` 는 없다. 사람 확인 결과도 서비스가 같은 행에 적는다. 증빙 충분이면 소명대기 → 관계확인(이어서 21 이 바로 재판정해 결재 경로로 올림), 증빙 부족이면 소명대기 → 지급보류.
 - **20 `feat/master-correction-regroup` 은 `MASTER_CHANGE` 를 더한다.** 정정 가능한 속성은 대표자 · 주소 · 등록계좌뿐이다(실입금계좌는 돈이 들어온 사실이라 신고로 고칠 수 없다). 적용하면 이전 값의 `valid_to` 를 정정일로 닫고 `[주장]` 새 행(`source_ref` = `master_change:번호`)을 더하며, 원본 `AGENCY` 는 고치지 않는다. 그 뒤 모든 식별속성으로 그룹을 새 `GROUP_VERSION` 으로 다시 계산한다. 소속 그룹(구성원 집합)이 바뀐 대리점의 돈이 안 나간 건만 영향을 받아 재검토필요로 돌아가고, 그중 결재 대기였던 건은 한도 판정 코드가 바로 다시 판정해 결재 경로에 올린다. 그룹이 그대로면 영향 건이 없고 근거 쌍만 보여 준다(결론 유지). 열려 있던 승인 요청은 `decision = 취소` 로 표시하고 포함 건을 떼며, 열린 소명 요청 · 상계 제안(22)도 취소한다.
 - **11 `feat/payment-mock` 은 `PAYMENT_ORDER` · `BANK_REPLY` 를 더한다.** 지급 지시는 재무만(403), 승인 건 또는 마지막 지시가 계좌오류였던 지급보류 건만 된다(409 — 증빙 부족으로 보류된 건이 지급되는 것을 막음). 은행 회신은 시연이 결과를 골라 넣는 API 이고 출처는 `모의`, 지시 하나에 회신 하나(두 번째는 409). 성공 → 지급완료, 계좌오류 → 지급보류(재무 계좌 확인 작업) → 다시 지시하면 새 지시를 만든다. 실제 수취계좌는 원본에 없어(설계안 2장) 지급 계좌 컬럼은 두지 않는다. 금액은 장려금액에서 확정된 상계액을 뺀 남은 금액이다(22).
-- **22 `feat/ext-ar-offset` 은 `OFFSET_PROPOSAL` · `AR_ADJUSTMENT` 를 더한다 [가정].** 관련자 그룹 건이 승인되면(결정 API 와 같은 트랜잭션) 그룹 구성원의 90일 초과 연체 채권 잔액을 보고, 남은 잔액이 있으면 건마다 제안 1개를 만들어 승인 → 상계검토로 보낸다(재무 상계 검토 작업). 상계 한도 `max_offset_krw` = min(지급할 남은 금액, 그룹 연체 잔액 − 같은 그룹 열린 제안이 잡은 몫)이고 코드가 계산한다. 단독 대리점의 연체는 재무 일반 회수 업무로 보고 대상에서 뺐다. 제안 상태: 재무검토 → 동의대기(재무가 1 ~ 한도에서 상계액 결정) → 상계확정(대리점 동의 [모의]) · 재무반려(상계하지 않음) · 동의거절 · 취소(정정 신고). 상계확정이면 상계액을 이 건 대리점 채권 먼저 · 오래된 것 먼저 나눠 `AR_ADJUSTMENT`(출처 `가정`)에 남기고(원본 `outstanding_krw` 는 그대로, 지금 잔액 = 원본 − 조정 합계), 전액이면 상계검토 → 상계완료, 일부면 상계검토에 남아 재무가 차액을 지급 지시한다. 재무반려 · 동의거절이면 전액 지급 지시. 결정 · 동의 전 상계검토 건의 지급 지시는 409. AI 추천 상계액은 `AI_RECOMMENDATION` 과 뜻이 달라(18 과 같은 이유) 제안 행에 직접 두므로 `rec_id` 는 없고, 단일 `ar_id` 대신 `group_id` 로 대상 채권을 찾는다. 영업 의견(`sales_opinion`)은 23 에서 더한다. 제안 상태 변화는 `EVENT_LOG`(`entity_type` = `offset_proposal`)에 남는다.
+- **22 `feat/ext-ar-offset` 은 `OFFSET_PROPOSAL` · `AR_ADJUSTMENT` 를 더한다 [가정].** 관련자 그룹 건이 승인되면(결정 API 와 같은 트랜잭션) 그룹 구성원의 90일 초과 연체 채권 잔액을 보고, 남은 잔액이 있으면 건마다 제안 1개를 만들어 승인 → 상계검토로 보낸다(재무 상계 검토 작업). 상계 한도 `max_offset_krw` = min(지급할 남은 금액, 그룹 연체 잔액 − 같은 그룹 열린 제안이 잡은 몫)이고 코드가 계산한다. 단독 대리점의 연체는 재무 일반 회수 업무로 보고 대상에서 뺐다. 제안 상태: 재무검토 → 동의대기(재무가 1 ~ 한도에서 상계액 결정) → 상계확정(대리점 동의 [모의]) · 재무반려(상계하지 않음) · 동의거절 · 취소(정정 신고). 상계확정이면 상계액을 이 건 대리점 채권 먼저 · 오래된 것 먼저 나눠 `AR_ADJUSTMENT`(출처 `가정`)에 남기고(원본 `outstanding_krw` 는 그대로, 지금 잔액 = 원본 − 조정 합계), 전액이면 상계검토 → 상계완료, 일부면 상계검토에 남아 재무가 차액을 지급 지시한다. 재무반려 · 동의거절이면 전액 지급 지시. 결정 · 동의 전 상계검토 건의 지급 지시는 409. AI 추천 상계액은 `AI_RECOMMENDATION` 과 뜻이 달라(18 과 같은 이유) 제안 행에 직접 두므로 `rec_id` 는 없고, 단일 `ar_id` 대신 `group_id` 로 대상 채권을 찾는다. 제안 상태 변화는 `EVENT_LOG`(`entity_type` = `offset_proposal`)에 남는다.
+- **23 `feat/dept-impact-sales-opinion` 은 `OFFSET_PROPOSAL` 에 영업 의견 · 회수 약정 컬럼을 더한다(부서 영향).** 제안이 생기면 영업지원팀에 "상계 영업 의견" 작업(상태 전이가 아닌 작업)이 열린다. 영업지원팀 · 영업임원은 재무 결정 전에 대리점 관계 부담을 보고 대안 [주장] 을 낸다: 전액 상계 · 부분 상계(1원 ~ 한도 미만 금액) · 지급 후 회수 약정. 의견은 AI 상계액 추천의 사실(`영업_의견`)과 재무 화면(입력칸 처음 값)에 들어가지만 결정을 막지는 않는다. 재무가 상계하지 않으면서 회수 약정 기한을 넣으면 "지급 후 회수 약정"이고(전액 지급, `collection_due_date`), 재무에 "회수 약정 관리" 작업이 열린다. 재무 결정이 영업 대안과 같은지는 `sales_followed` 로 남는다(의견이 없으면 비어 있음). 의견을 내거나 재무가 결정하면 영업 작업은 닫힌다.
 
 ```mermaid
 erDiagram
@@ -391,6 +392,11 @@ erDiagram
     int overdue_total_krw "제안 당시 그룹 연체 잔액"
     int max_offset_krw "상계 한도 · 코드 계산"
     string status "재무검토 동의대기 상계확정 재무반려 동의거절 취소"
+    string sales_alternative "전액 상계 부분 상계 지급 후 회수 약정 · 주장"
+    int sales_amount_krw "부분 상계 권고액"
+    string sales_opinion "대리점 관계 부담"
+    string sales_by
+    datetime sales_at
     int ai_amount_krw "AI 추천 상계액 · 주장"
     json ai_rationale
     json ai_counter_evidence
@@ -404,6 +410,8 @@ erDiagram
     string decided_by
     datetime decided_at
     bool agreed "AI 추천과 같은가"
+    bool sales_followed "영업 대안과 같은가"
+    date collection_due_date "지급 후 회수 약정 기한"
     string agency_consent "동의 거절"
     string consent_provenance "모의"
     datetime consented_at
