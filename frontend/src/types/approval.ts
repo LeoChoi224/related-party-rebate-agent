@@ -9,11 +9,15 @@ export type DecisionRequest = {
   reason: string
   actor: string
   role: string
+  /** 반려하면서 대리점에 소명을 요청할 항목. 반려된 건마다 소명 요청이 하나씩 생긴다. */
+  explanation_items?: string[]
 }
 
 export type ClaimDecisionResult = {
   rebate_id: string
   status: ClaimStatus
+  /** 반려와 함께 만든 소명 요청 */
+  explanation_ids: number[]
 }
 
 export type ApprovalDecisionResult = {
@@ -21,6 +25,7 @@ export type ApprovalDecisionResult = {
   decision: Decision
   decided_by: string
   rebate_ids: string[]
+  explanation_ids: number[]
 }
 
 /** 건 상세의 승인 요청 칸. 결정 전에는 결정 · 사유 · 결정자 · 시각이 null 이다. */
