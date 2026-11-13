@@ -1,5 +1,6 @@
 /**
- * 전역 스타일: 색 변수, 기본 글꼴, 레이아웃(상단 + 왼쪽 메뉴 + 가운데), 표 · 버튼 · 오류 기본 모양.
+ * 전역 스타일: 색 변수, 기본 글꼴, 레이아웃(상단 + 왼쪽 메뉴 + 가운데), 표 · 버튼 · 오류 기본 모양,
+ * 상태 배지 · 처리함 필터.
  */
 :root {
   --bg: #f6f7f9;
@@ -68,6 +69,8 @@ body {
 
 .app-main {
   padding: 24px;
+  /* 격자 칸은 기본으로 내용보다 좁아지지 않는다. 0 이어야 넓은 표가 칸 안에서 옆으로 넘어간다. */
+  min-width: 0;
 }
 
 button {
@@ -103,4 +106,59 @@ td {
 .actions {
   display: flex;
   gap: 8px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* 금액 열은 자릿수를 맞춰 오른쪽 정렬한다. */
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 좁은 화면에서는 칸을 줄바꿈하지 않고 표만 옆으로 넘긴다. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.claim-table th,
+.claim-table td {
+  white-space: nowrap;
+}
+
+.status-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.badge-neutral {
+  color: var(--muted);
+  background: #eef1f4;
+}
+
+.badge-wait {
+  color: var(--accent);
+  background: #e3ecfa;
+}
+
+.badge-ok {
+  color: #2e7d32;
+  background: #e5f3e6;
+}
+
+.badge-stop {
+  color: var(--danger);
+  background: #fbe7e7;
 }

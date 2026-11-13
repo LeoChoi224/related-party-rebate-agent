@@ -1,18 +1,20 @@
 """장려금 건 API.
 
-대상월 접수, 전결 건 결정, 지급 지시(11)가 있다. 처리함 목록 · 건 상세는 13 · 14 에서 더한다.
+처리함 목록(13), 대상월 접수, 전결 건 결정, 지급 지시(11)가 있다. 건 상세는 14 에서 더한다.
 권한 부족(403) · 상태 전이 오류(409)는 main.py 의 처리기가 바꾸고, 요청 트랜잭션은 롤백된다.
 """
 
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import select
 
 from app.api.deps import SessionDep
-from app.models import RebateClaim
+from app.models import Agency, RebateClaim, RelatedGroup
+from app.models.enums import ClaimStatus
 from app.schemas.approval import ClaimDecisionResult, DecisionRequest
 from app.schemas.payment import PaymentOrderRequest, PaymentOrderResult
-from app.schemas.rebate import IntakeResult
+from app.schemas.rebate import ClaimListItem, IntakeResult
 from app.services.approval import decide_claim
 from app.services.intake import intake_period
 from app.services.payment import order_payment
@@ -21,6 +23,42 @@ router = APIRouter(prefix="/claims", tags=["claims"])
 
 # 연도 4자리-01~12월. 2026-6 · 2026-13 · 202606 은 422 가 된다.
 PERIOD_PATTERN = r"^\d{4}-(0[1-9]|1[0-2])$"
+
+
+# 접두사 /claims 자체가 목록 주소다. "/" 로 두면 /api/claims 가 307 로 한 번 더 돈다.
+@router.get("")
+def list_claims(
+    session: SessionDep,
+    # list 인자는 Query() 가 없으면 요청 본문으로 읽힌다. ?status=전결대기&status=상신대기
+    status: Annotated[
+        list[ClaimStatus] | None,
+        Query(description="거를 상태(여러 개 가능). 비우면 전체"),
+    ] = None,
+) -> list[ClaimListItem]:
+    """처리함 목록. 고른 상태의 건을 건 ID 순으로 돌려준다."""
+    query = (
+        select(RebateClaim, Agency.agency_name, RelatedGroup.label)
+        .join(Agency, RebateClaim.agency_id == Agency.agency_id)
+        # 단독 대리점은 group_id 가 비어 있다. 그냥 join 이면 그 건이 목록에서 빠진다.
+        .outerjoin(RelatedGroup, RebateClaim.group_id == RelatedGroup.group_id)
+        .order_by(RebateClaim.rebate_id)
+    )
+    if status:
+        query = query.where(RebateClaim.status.in_(status))
+    return [
+        ClaimListItem(
+            rebate_id=claim.rebate_id,
+            agency_id=claim.agency_id,
+            agency_name=agency_name,
+            period_ym=claim.period_ym,
+            rebate_amount_krw=claim.rebate_amount_krw,
+            status=claim.status,
+            min_authority=claim.min_authority,
+            group_label=group_label,
+            group_sum_krw=claim.group_sum_krw,
+        )
+        for claim, agency_name, group_label in session.execute(query).all()
+    ]
 
 
 @router.post(
