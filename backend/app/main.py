@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import Engine
 
+from app.agents.checkpointer import make_checkpointer
 from app.api.router import api_router
 from app.core.config import FRONTEND_DIST
 from app.core.database import engine as default_engine
@@ -65,6 +66,8 @@ def create_app(
     app = FastAPI(title="W07 판매장려금 통제 데스크", lifespan=lifespan)
     # 테스트는 임시 DB 엔진을 넣어 실제 app.db 를 건드리지 않는다.
     app.state.engine = engine
+    # 그래프 진행 위치. 앱을 켤 때마다 비어서 시작한다(업무 DB 와 같이).
+    app.state.checkpointer = make_checkpointer()
     # 전이 오류 409 · 권한 부족 403 은 여러 API 가 함께 내므로 라우트마다 잡지 않고 한 곳에 둔다.
     app.add_exception_handler(InvalidTransitionError, invalid_transition_handler)
     app.add_exception_handler(
