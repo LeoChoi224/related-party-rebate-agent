@@ -21,11 +21,9 @@ import {
 } from '../types/enums.ts'
 import type { Explanation, ExplanationReply } from '../types/explanation.ts'
 import type { ClaimDetail } from '../types/rebate.ts'
+import { DEMO_REPLY } from '../utils/demoEvents.ts'
 import { formatDateTime } from '../utils/format.ts'
 import ProvenanceBadge from './ProvenanceBadge.tsx'
-
-/** 시나리오 3 의 모의 회신 문구. 시연할 때 입력칸에 채워 넣는다. */
-const DEMO_REPLY = 'D-024는 별도 법인이고, 계좌가 겹친 건 세무대리인이 대신 입금해서입니다.'
 
 const VERDICT_TONE: Record<CheckVerdict, string> = {
   일치: 'ok',
