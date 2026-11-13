@@ -224,20 +224,52 @@ def test_api_lists_tasks_by_department(client):
 
 
 def test_api_task_moves_open_progress_done_then_409(client):
-    """열림 → 진행 → 완료는 200, 완료를 다시 열면 409."""
-    res = client.patch("/api/tasks/3", json={"status": "진행"})
+    """열림 → 진행 → 완료는 200, 완료를 다시 열면 409. 손으로 닫는 정황 소명 작업(1번)으로 본다."""
+    res = client.patch("/api/tasks/1", json={"status": "진행"})
     assert (res.status_code, res.json()["status"]) == (200, "진행")
-    assert client.get("/api/tasks", params={"status": "진행"}).json()[0]["task_id"] == 3
+    assert client.get("/api/tasks", params={"status": "진행"}).json()[0]["task_id"] == 1
 
-    res = client.patch("/api/tasks/3", json={"status": "완료"})
+    res = client.patch("/api/tasks/1", json={"status": "완료"})
     assert res.status_code == 200
     assert res.json()["closed_at"] is not None
 
-    res = client.patch("/api/tasks/3", json={"status": "열림"})
+    res = client.patch("/api/tasks/1", json={"status": "열림"})
     assert res.status_code == 409
     assert res.json() == {
-        "detail": "작업 상태를 바꿀 수 없습니다: 완료 → 열림 (작업 3)"
+        "detail": "작업 상태를 바꿀 수 없습니다: 완료 → 열림 (작업 1)"
     }
+
+
+def test_api_transition_task_cannot_be_closed_by_hand(client):
+    """G1 지급 실행 작업(3번)은 진행은 되지만, 건이 아직 승인이라 손으로 완료하면 409."""
+    assert client.patch("/api/tasks/3", json={"status": "진행"}).status_code == 200
+
+    res = client.patch("/api/tasks/3", json={"status": "완료"})
+    assert res.status_code == 409
+    assert res.json() == {
+        "detail": "건 RB-00054 이(가) 아직 승인 상태라 '지급 실행' 작업을 닫을 수 없습니다. "
+        "건을 처리하면 자동으로 닫힙니다 (작업 3)"
+    }
+    # 거절된 요청은 아무것도 바꾸지 않는다.
+    task = client.get("/api/tasks", params={"status": "진행"}).json()[0]
+    assert (task["task_id"], task["closed_at"]) == (3, None)
+
+
+def test_api_lists_tasks_by_several_statuses(client):
+    """상태를 둘 고르면 합집합이다. 완료를 빼면 할 일만 남는다."""
+    client.patch("/api/tasks/1", json={"status": "완료"})
+    client.patch("/api/tasks/2", json={"status": "진행"})
+    todo = client.get("/api/tasks", params={"status": ["열림", "진행"]}).json()
+    assert [t["task_id"] for t in todo] == [2, 3, 4, 5]
+    assert len(client.get("/api/tasks").json()) == 5
+
+
+def test_api_task_times_are_marked_utc(client):
+    """작업 시각은 "Z" 가 붙어 나가 화면이 한국 시각으로 잘못 읽지 않는다."""
+    client.patch("/api/tasks/1", json={"status": "완료"})
+    task = client.get("/api/tasks", params={"status": "완료"}).json()[0]
+    assert task["created_at"].endswith("Z")
+    assert task["closed_at"].endswith("Z")
 
 
 @pytest.mark.parametrize(
