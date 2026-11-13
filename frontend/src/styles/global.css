@@ -1,3 +1,106 @@
 /**
- * 전역 스타일: 색상 변수, 기본 글꼴, 표·배지 공통 스타일.
+ * 전역 스타일: 색 변수, 기본 글꼴, 레이아웃(상단 + 왼쪽 메뉴 + 가운데), 표 · 버튼 · 오류 기본 모양.
  */
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --text: #1f2933;
+  --muted: #616e7c;
+  --border: #d9dee5;
+  --accent: #1f5fbf;
+  --danger: #c62828;
+  font-family: -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  grid-template-columns: 180px 1fr;
+  min-height: 100vh;
+}
+
+.app-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.base-date {
+  color: var(--muted);
+}
+
+.role-switcher {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+
+.app-nav a {
+  padding: 10px 20px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.app-nav a.active {
+  color: var(--accent);
+  font-weight: 700;
+  background: var(--bg);
+}
+
+.app-main {
+  padding: 24px;
+}
+
+button {
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: #ffffff;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+table {
+  border-collapse: collapse;
+  background: var(--panel);
+}
+
+th,
+td {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
