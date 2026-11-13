@@ -48,3 +48,20 @@ class ExplanationReviewState(TypedDict, total=False):
     fallback_used: bool
     # 사람 확인({"judgement", "reason", "actor"})
     decision: dict[str, str]
+
+
+class MasterChangeParserState(TypedDict, total=False):
+    # 대상: 정정 신고 문장 한 건
+    report_id: int
+    raw_text: str
+    # 가드가 쓰는 사실: 대리점 ID → 이름, (대리점, 속성) → 지금 값
+    agency_names: dict[str, str]
+    current_values: dict[str, str]
+    llm_available: bool
+    # AI 출력(MasterChangeParse.model_dump(mode="json")), 대체 모드면 None
+    attempts: int
+    parse: dict[str, Any] | None
+    problems: list[str]
+    fallback_used: bool
+    # 사람 확인({"apply", "actor"}). 정정 적용 · 기록은 확인 API 가 서비스로 이미 했다.
+    decision: dict[str, Any]
