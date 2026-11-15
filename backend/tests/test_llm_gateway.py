@@ -22,7 +22,7 @@ def make_settings(**values) -> Settings:
 @pytest.fixture(autouse=True)
 def no_llm_env(monkeypatch):
     """환경 변수에 진짜 값이 있어도 테스트에 섞이지 않게 지운다."""
-    for name in ("LLM_PROVIDER", "LLM_MODEL", "OPENAI_API_KEY"):
+    for name in ("LLM_PROVIDER", "LLM_MODEL", "OPENAI_API_KEY", "LLM_REASONING_EFFORT"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -60,6 +60,21 @@ def test_provider_and_key_make_openai_model_without_calling():
     assert isinstance(model, ChatOpenAI)
     assert model.model_name == "gpt-5-mini"
     assert model.max_retries == 1
+    # 배포 앱 시간 초과(11/15) 뒤: 90초까지 기다리고, gpt-5 추론 강도를 낮춘다.
+    assert (model.request_timeout, model.reasoning_effort) == (90, "low")
+
+
+def test_empty_reasoning_effort_is_not_sent():
+    """추론 강도를 비우면 넣지 않는다(추론 모델이 아니면 이 값을 받지 않는다)."""
+    model = get_chat_model(
+        make_settings(
+            llm_provider="openai",
+            llm_model="gpt-4o-mini",
+            openai_api_key="sk-test",
+            llm_reasoning_effort=" ",
+        )
+    )
+    assert model.reasoning_effort is None
 
 
 def test_settings_reads_env_and_hides_key(monkeypatch):

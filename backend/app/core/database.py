@@ -9,12 +9,17 @@ from sqlalchemy import Engine, create_engine, event
 
 from app.core.config import DB_PATH
 
+# 다른 요청이 쓰기 잠금을 잡고 있을 때 기다리는 시간(초). sqlite3 기본값은 5초.
+LOCK_WAIT_SECONDS = 30
+
 
 def make_engine(url: str) -> Engine:
     """외래키 검사를 켠 SQLite 엔진을 만든다. 테스트는 임시 파일 주소를 넘긴다."""
     # 파일 DB 면 SQLAlchemy 2.0 이 check_same_thread=False 를 알아서 넣는다.
     # 그래서 FastAPI 가 다른 스레드에서 연결을 다시 꺼내 써도 된다.
-    engine = create_engine(url)
+    # AI 요청은 LLM 을 부르는 동안 쓰기 잠금을 잡고 있다. 기본 대기 5초면 그동안 들어온
+    # 다른 쓰기가 "database is locked" 로 실패해(11/15 배포 앱) 30초까지 기다리게 한다.
+    engine = create_engine(url, connect_args={"timeout": LOCK_WAIT_SECONDS})
 
     @event.listens_for(engine, "connect")
     def _enable_foreign_keys(dbapi_connection, _connection_record) -> None:

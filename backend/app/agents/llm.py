@@ -22,8 +22,9 @@ _API_KEYS: dict[str, Callable[[Settings], SecretStr]] = {
     "openai": lambda s: s.openai_api_key,
 }
 
-# 기본값은 늦은 응답을 오래 기다리고 여러 번 다시 보내 시연 중 버튼이 멈춘다.
-TIMEOUT_SECONDS = 30
+# 라이브러리 기본값은 늦은 응답을 오래 기다리고 여러 번 다시 보내 시연 중 버튼이 멈춘다.
+# 30초는 배포 앱에서 gpt-5-mini 상계 추천이 두 번 다 시간 초과로 끝나 90초로 늘렸다(11/15).
+TIMEOUT_SECONDS = 90
 MAX_RETRIES = 1
 
 
@@ -44,10 +45,15 @@ def get_chat_model(settings: Settings | None = None) -> BaseChatModel | None:
         return None
 
     # temperature 는 넣지 않는다. gpt-5 계열은 기본값(1) 말고는 받지 않는다.
+    options = {}
+    effort = settings.llm_reasoning_effort.strip()
+    if effort:
+        options["reasoning_effort"] = effort
     return init_chat_model(
         settings.llm_model,
         model_provider=provider,
         api_key=api_key,
         timeout=TIMEOUT_SECONDS,
         max_retries=MAX_RETRIES,
+        **options,
     )

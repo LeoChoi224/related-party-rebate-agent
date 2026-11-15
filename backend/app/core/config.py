@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # 비어 있으면 대체 모드(AI 추천 없이 규정 결과만).
     llm_provider: str = ""
     llm_model: str = "gpt-5-mini"
+    # gpt-5 계열의 추론 강도. 기본(medium)은 배포 앱에서 30초를 넘겨 시간 초과가 났다(11/15).
+    # 추론 모델이 아니면(gpt-4o 등) 이 값을 받지 않으므로 비워 둔다.
+    llm_reasoning_effort: str = "low"
     # 로그 · 오류에 실려도 '**********' 로만 보인다.
     openai_api_key: SecretStr = SecretStr("")
 
